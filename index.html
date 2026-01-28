@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="no-referrer"> 
+    <title>Akur TV</title>
+    <style>
+        /* === СТИЛИ === */
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800&display=swap');
+
+        body {
+            background-color: #080808;
+            color: #fff;
+            font-family: 'Montserrat', sans-serif;
+            margin: 0;
+            overflow: hidden;
+            display: flex;
+            height: 100vh;
+            user-select: none;
+        }
+
+        /* === ЗАСТАВКА === */
+        #splash {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; z-index: 9999;
+            display: flex; justify-content: center; align-items: center;
+            transition: opacity 0.5s;
+        }
+        .splash-text {
+            font-size: 80px; font-weight: 900; letter-spacing: 5px;
+            background: linear-gradient(45deg, #E50914, #ff8800);
+            -webkit-background-clip: text; color: transparent;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse { 0% {transform: scale(1);} 50% {transform: scale(1.05);} 100% {transform: scale(1);} }
+
+        /* === МЕНЮ === */
+        .sidebar {
+            width: 280px; background: #121212; display: flex; flex-direction: column;
+            padding-top: 30px; z-index: 100; box-shadow: 4px 0 15px rgba(0,0,0,0.5);
+            flex-shrink: 0;
+        }
+        .logo-area { text-align: center; margin-bottom: 40px; }
+        .logo-text { font-size: 32px; font-weight: 800; color: #E50914; letter-spacing: 2px; }
+
+        .menu-item {
+            padding: 18px 30px; font-size: 18px; color: #888; cursor: pointer;
+            transition: all 0.2s; border-left: 4px solid transparent;
+        }
+        .menu-item:hover, .menu-item.focused { background-color: #333; color: white; border-left-color: #E50914; }
+        .menu-item.active { color: white; font-weight: 600; background: rgba(255,255,255,0.05); }
+
+        /* === КОНТЕНТ === */
+        .content {
+            flex: 1; padding: 30px 50px;
+            background: radial-gradient(at top right, #1f1f1f, #000);
+            display: flex; flex-direction: column;
+            height: 100vh; box-sizing: border-box;
+        }
+        .header { margin-bottom: 20px; border-bottom: 1px solid #333; padding-bottom: 10px; flex-shrink: 0; }
+        .header h2 { margin: 0; font-size: 24px; color: #ddd; }
+
+        /* Поиск */
+        #search-box { display: none; margin-bottom: 20px; flex-shrink: 0; }
+        #search-input {
+            width: 100%; padding: 15px; font-size: 20px;
+            background: #222; border: 2px solid #444; color: white;
+            border-radius: 8px; outline: none;
+        }
+        #search-input:focus { border-color: #E50914; }
+
+        /* Сетка */
+        .grid {
+            display: grid; grid-template-columns: repeat(4, 1fr); gap: 25px;
+            align-content: start; overflow-y: auto; padding-bottom: 100px; padding-right: 10px;
+            flex: 1; scroll-behavior: smooth;
+        }
+        .grid::-webkit-scrollbar { width: 8px; }
+        .grid::-webkit-scrollbar-thumb { background: #444; border-radius: 4px; }
+
+        /* Карточка */
+        .card {
+            background: #222; border-radius: 10px; overflow: hidden; position: relative;
+            aspect-ratio: 2/3; border: 3px solid transparent; transition: transform 0.2s; cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+        .card img { width: 100%; height: 100%; object-fit: cover; }
+        .card.studio { aspect-ratio: 16/9; background: white; display: flex; align-items: center; justify-content: center; }
+        .card.studio img { width: 70%; object-fit: contain; }
+        
+        .folder-badge {
+            position: absolute; top: 10px; right: 10px;
+            background: rgba(229, 9, 20, 0.9); color: white;
+            padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+        }
+
+        .card:hover, .card.focused {
+            transform: scale(1.05); border-color: white; z-index: 10;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.8);
+        }
+
+        /* === ПЛЕЕР И КНОПКА === */
+        #player {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: black; z-index: 200;
+        }
+        iframe { width: 100%; height: 100%; border: none; }
+        
+        /* Стиль кнопки ВЫХОД */
+        #close-btn {
+            position: absolute; 
+            top: 30px; 
+            right: 30px;
+            background: rgba(0, 0, 0, 0.6); /* Полупрозрачный черный */
+            color: white;
+            padding: 15px 30px; 
+            border-radius: 8px; 
+            font-weight: 600; 
+            font-size: 18px;
+            cursor: pointer; 
+            z-index: 201; 
+            border: 2px solid rgba(255,255,255,0.3);
+            transition: opacity 0.3s, transform 0.2s;
+            opacity: 0; /* Скрыта по умолчанию */
+        }
+        #close-btn:hover, #close-btn.visible { 
+            opacity: 1; 
+            background: rgba(0, 0, 0, 0.9);
+            border-color: white;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="splash"><div class="splash-text">AKUR</div></div>
+
+    <div class="sidebar">
+        <div class="logo-area"><div class="logo-text">AKUR</div></div>
+        <div class="menu-item" onclick="activateMenu(0)">🔍 Поиск</div>
+        <div class="menu-item" onclick="activateMenu(1)">🏠 Главная</div>
+        <div class="menu-item" onclick="activateMenu(2)">🕒 История</div>
+        <div class="menu-item" onclick="activateMenu(3)">👶 Детям</div>
+        <div class="menu-item" onclick="activateMenu(4)">🎭 Жанры</div>
+        <div class="menu-item" onclick="activateMenu(5)">ℹ️ О нас</div>
+    </div>
+
+    <div class="content">
+        <div class="header"><h2 id="page-title">Студии</h2></div>
+        <div id="search-box"><input type="text" id="search-input" placeholder="Найти фильм..." autocomplete="off"></div>
+        <div id="grid" class="grid"></div>
+    </div>
+
+    <div id="player">
+        <div id="close-btn" onclick="closePlayer()">ВЫЙТИ В МЕНЮ</div>
+        <iframe id="video-frame" src="" allow="autoplay; fullscreen; encrypted-media; picture-in-picture;" allowfullscreen></iframe>
+    </div>
+
+    <script>
+        // === БАЗА ДАННЫХ ===
+        const db = [
+            // СТУДИИ
+            { id: 'netflix', type: 'studio', title: 'Netflix', img: 'https://upload.wikimedia.org/wikipedia/commons/0/08/Netflix_2015_logo.svg' },
+            { id: 'disney', type: 'studio', title: 'Disney', img: 'https://upload.wikimedia.org/wikipedia/commons/3/3e/Disney%2B_logo.svg' },
+            { id: 'wb', type: 'studio', title: 'Warner Bros', img: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d2/Warner_Bros._%282019%29_logo.svg/1200px-Warner_Bros._%282019%29_logo.svg.png' },
+
+            // === NETFLIX: ПАПКИ И ФИЛЬМЫ ===
+            { id: 'stranger_things_folder', type: 'folder', parent: 'netflix', title: 'Очень странные дела', img: 'https://www.kinomania.ru/sites/default/files/styles/400/public/film_gallery/8a4394888248b6d62f640c76961cc0fe.jpeg?itok=mFiT-abt' },
+            { id: 'chronicles_fr', type: 'folder', parent: 'netflix', title: 'Хроники Рождества (Коллекция)', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/1773646/c5d96751-35fa-4dab-9f72-697aacb04b45/600x900' },
+            { id: 'klaus_m', type: 'movie', parent: 'netflix', title: 'Клаус', img: 'https://images-s.kinorium.com/movie/poster/1555565/w1500_45563041.jpg', url: 'https://vk.com/video_ext.php?oid=-223928932&id=456239034&hd=2' },
+            { id: 'boy_christmas_m', type: 'movie', parent: 'netflix', title: 'Мальчик по имени Рождество', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/4774061/fd23e643-2ee0-4e31-ba6a-8c1960b695e8/600x900', url: 'https://vk.com/video_ext.php?oid=-191959649&id=456241188&hd=2' },
+
+            // === ХРОНИКИ РОЖДЕСТВА (ВНУТРИ ПАПКИ) ===
+            { id: 'chronicles_1', type: 'movie', parent: 'chronicles_fr', title: 'Хроники Рождества', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/1773646/c5d96751-35fa-4dab-9f72-697aacb04b45/600x900', url: 'https://vk.com/video_ext.php?oid=-217969182&id=456240948&hd=2' },
+            { id: 'chronicles_2', type: 'movie', parent: 'chronicles_fr', title: 'Хроники Рождества 2', img: 'https://24smi.org/public/media/movie/2021/11/18/tkmnk9xurbzj-rozhdestvenskie-khroniki-2.jpg', url: 'https://vk.com/video_ext.php?oid=-45052261&id=456247596&hd=2' },
+
+            // === ОЧЕНЬ СТРАННЫЕ ДЕЛА (СЕЗОНЫ) ===
+            { id: 'st_s1', type: 'movie', parent: 'stranger_things_folder', title: 'Сезон 1', img: 'https://www.kinomania.ru/sites/default/files/styles/400/public/film_gallery/8a4394888248b6d62f640c76961cc0fe.jpeg?itok=mFiT-abt', url: 'https://vk.com/video_ext.php?oid=-170333242&id=456239923&hd=2' },
+            { id: 'st_s2', type: 'movie', parent: 'stranger_things_folder', title: 'Сезон 2', img: 'https://upload.wikimedia.org/wikipedia/ru/thumb/f/f7/Stranger_Things_season_2.jpg/960px-Stranger_Things_season_2.jpg', url: 'https://vk.com/video_ext.php?oid=-227396331&id=456240934&hd=2' },
+            { id: 'st_s3', type: 'movie', parent: 'stranger_things_folder', title: 'Сезон 3', img: 'https://upload.wikimedia.org/wikipedia/ru/thumb/5/5e/Stranger_Things_season_3.jpg/540px-Stranger_Things_season_3.jpg', url: 'https://vk.com/video_ext.php?oid=588164737&id=456239818&hd=2' },
+            { id: 'st_s4', type: 'movie', parent: 'stranger_things_folder', title: 'Сезон 4', img: 'https://images-s.kinorium.com/movie/poster/1545339/1080_53847958.jpg', url: 'https://vk.com/video_ext.php?oid=-80021931&id=456242562&hd=2' },
+            { id: 'st_s5', type: 'movie', parent: 'stranger_things_folder', title: 'Сезон 5', img: 'https://i.playground.ru/e/1rJtR4NOK-WNrVDTnYVdFQ.jpeg', url: 'https://vk.com/video_ext.php?oid=-80021931&id=456247344&hd=2' },
+
+            // === DISNEY (Коллекции) ===
+            { id: 'pets_fr', type: 'folder', parent: 'disney', title: 'Тайная жизнь домашних животных (Коллекция)', img: 'https://upload.wikimedia.org/wikipedia/ru/5/58/%D0%A2%D0%B0%D0%B9%D0%BD%D0%B0%D1%8F_%D0%B6%D0%B8%D0%B7%D0%BD%D1%8C_%D0%B4%D0%BE%D0%BC%D0%B0%D1%88%D0%BD%D0%B8%D1%85_%D0%B6%D0%B8%D0%B2%D0%BE%D1%82%D0%BD%D1%8B%D1%85_%28%D0%BF%D0%BE%D1%81%D1%82%D0%B5%D1%80%29.jpg' },
+            { id: 'nemo_fr', type: 'folder', parent: 'disney', title: 'В поисках Немо (Коллекция)', img: 'https://avatars.mds.yandex.net/get-mpic/4252138/2a000001920543d91b32e518f84c0c20c1e5/orig' },
+            { id: 'madagascar_fr', type: 'folder', parent: 'disney', title: 'Мадагаскар (Коллекция)', img: 'https://upload.wikimedia.org/wikipedia/ru/thumb/2/28/Madagascar_film.jpg/330px-Madagascar_film.jpg' },
+            { id: 'trolls_fr', type: 'folder', parent: 'disney', title: 'Тролли (Коллекция)', img: 'https://ir.ozone.ru/multimedia/c1000/1023828741.jpg' },
+            { id: 'monsters_fr', type: 'folder', parent: 'disney', title: 'Корпорация монстров (Коллекция)', img: 'https://cdn.ananasposter.ru/image/cache/catalog/poster/pos23/10/62977-1000x830.jpg' },
+            { id: 'despicable_me_fr', type: 'folder', parent: 'disney', title: 'Гадкий я (Коллекция)', img: 'https://www.dvddom.ru/wa-data/public/shop/products/89/04/70489/images/397657/397657.970.jpg' },
+            { id: 'inside_out_fr', type: 'folder', parent: 'disney', title: 'Головоломка (Коллекция)', img: 'https://lh3.googleusercontent.com/proxy/jY7bVSvEmw4rELdeFZOPBEP7Wh4Rd3aP-3pySNIjzEZ6oTd8Ig_xMsc7uCP9DIBEVdMJS0Z93D7YuOxsEcVS5TILHHfl1SmpAYRDogNixL632KMU' },
+            { id: 'moana_fr', type: 'folder', parent: 'disney', title: 'Моана (Коллекция)', img: 'https://i.pinimg.com/736x/b9/e8/f2/b9e8f21d14cfef40ed7feb6ff5020c8c.jpg' },
+            { id: 'shrek_fr', type: 'folder', parent: 'disney', title: 'Шрек (Коллекция)', img: 'https://upload.wikimedia.org/wikipedia/ru/3/39/Shrek.jpg' },
+            { id: 'frozen_fr', type: 'folder', parent: 'disney', title: 'Холодное сердце (Коллекция)', img: 'https://static.okko.tv/images/v4/a1d5753c-1fee-4753-b293-437bf944b694' },
+            { id: 'puss_fr', type: 'folder', parent: 'disney', title: 'Кот в сапогах (Коллекция)', img: 'https://kino.vl.ru/kino/images/big_0016.jpg' },
+            { id: 'zootopia_fr', type: 'folder', parent: 'disney', title: 'Зверополис (Коллекция)', img: 'https://thumbs.dfs.ivi.ru/storage0/contents/d/4/2a10de073f4748962f0ac1e409bcfd.jpg' },
+            { id: 'sing_fr', type: 'folder', parent: 'disney', title: 'Зверопой (Коллекция)', img: 'https://upload.wikimedia.org/wikipedia/ru/8/87/Sing_2_poster.jpg' },
+
+            // === DISNEY (Фильмы) ===
+            { id: 'elio_m', type: 'movie', parent: 'disney', title: 'Элио', img: 'https://a113.ru/upload/resize_cache/iblock/183/rx0iqlf4pcu7om0rfbsvg3ml3wo2508j/270_404_2/nalnape222.jpg', url: 'https://vk.com/video_ext.php?oid=824810750&id=456248203&hd=2' },
+            { id: 'red_m', type: 'movie', parent: 'disney', title: 'Я краснею', img: 'https://ic.pics.livejournal.com/iragaran/90735419/3201/3201_760.jpg', url: 'https://vk.com/video_ext.php?oid=-198824496&id=456239383&hd=2' },
+            { id: 'elemental_m', type: 'movie', parent: 'disney', title: 'Элементарно', img: 'https://www.kinonews.ru/insimgs/2023/poster/poster116531_3.webp', url: 'https://vk.com/video_ext.php?oid=-186212523&id=456239030&hd=2' },
+            { id: 'mune_m', type: 'movie', parent: 'disney', title: 'Хранитель луны', img: 'https://upload.wikimedia.org/wikipedia/ru/e/e2/%D0%A5%D1%80%D0%B0%D0%BD%D0%B8%D1%82%D0%B5%D0%BB%D1%8C_%D0%9B%D1%83%D0%BD%D1%8B_%282014%29.jpg', url: 'https://vk.com/video_ext.php?oid=-23712274&id=456240556&hd=2' },
+            { id: 'encanto_m', type: 'movie', parent: 'disney', title: 'Энканто', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/4303601/fab75458-dd2e-4861-8668-f591da4f61c4/220x330', url: 'https://vk.com/video_ext.php?oid=-218463181&id=456239543&hd=2' },
+            { id: 'raya_m', type: 'movie', parent: 'disney', title: 'Райя и последний дракон', img: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQTOPH3Bzl2C2kQIPu_SwYTMqqtoIs2E5HrQkDDIrSB3N4f3FulHuYDKmH5EvBKgTpNtG7XLVBBVx-bjUCQLj1yR9FPfEapZpt9m-3QtQ&s=10', url: 'https://vk.com/video_ext.php?oid=-226802088&id=456244894&hd=2' },
+            { id: 'onward_m', type: 'movie', parent: 'disney', title: 'Вперёд', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/1946459/442dc4a0-a101-46aa-aa9f-79678f92a5d7/600x900', url: 'https://vk.com/video_ext.php?oid=-80021931&id=456243686&hd=2' },
+            { id: 'coco_m', type: 'movie', parent: 'disney', title: 'Тайна Коко', img: 'https://upload.wikimedia.org/wikipedia/ru/d/d7/Coco_%282017_film%29_logo.jpg', url: 'https://vk.com/video_ext.php?oid=-230447797&id=456239035&hd=2' },
+            { id: 'luca_m', type: 'movie', parent: 'disney', title: 'Лука', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/4483445/6ad6cf7f-c95e-48b1-9949-ccf0c29b8f7d/220x330', url: 'https://vk.com/video_ext.php?oid=-217081635&id=456239240&hd=2' },
+
+            // === ВНУТРИ КОЛЛЕКЦИЙ ===
+            // Тайная жизнь домашних животных
+            { id: 'pets1', type: 'movie', parent: 'pets_fr', title: 'Тайная жизнь домашних животных', img: 'https://upload.wikimedia.org/wikipedia/ru/5/58/%D0%A2%D0%B0%D0%B9%D0%BD%D0%B0%D1%8F_%D0%B6%D0%B8%D0%B7%D0%BD%D1%8C_%D0%B4%D0%BE%D0%BC%D0%B0%D1%88%D0%BD%D0%B8%D1%85_%D0%B6%D0%B8%D0%B2%D0%BE%D1%82%D0%BD%D1%8B%D1%85_%28%D0%BF%D0%BE%D1%81%D1%82%D0%B5%D1%80%29.jpg', url: 'https://vk.com/video_ext.php?oid=-217081635&id=456239495&hd=2' },
+            { id: 'pets2', type: 'movie', parent: 'pets_fr', title: 'Тайная жизнь домашних животных 2', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/1629390/e0753994-6ce8-48eb-8d2f-eeb33a86d43b/600x900', url: 'https://vk.com/video_ext.php?oid=-223476607&id=456239434&hd=2' },
+
+            // Немо
+            { id: 'nemo', type: 'movie', parent: 'nemo_fr', title: 'В поисках Немо', img: 'https://ir.ozone.ru/s3/multimedia-3/c1000/6389281719.jpg', url: 'https://vk.com/video_ext.php?oid=-127233416&id=456240189&hd=2' },
+            { id: 'dory', type: 'movie', parent: 'nemo_fr', title: 'В поисках Дори', img: 'https://upload.wikimedia.org/wikipedia/ru/8/8a/%D0%92_%D0%BF%D0%BE%D0%B8%D1%81%D0%BA%D0%B0%D1%85_%D0%94%D0%BE%D1%80%D0%B8_%28%D0%BF%D0%BE%D1%81%D1%82%D0%B5%D1%80%29.jpg', url: 'https://vk.com/video_ext.php?oid=-118840854&id=456252818&hd=2' },
+
+            // Мадагаскар
+            { id: 'madagascar1', type: 'movie', parent: 'madagascar_fr', title: 'Мадагаскар', img: 'https://ru-images.kinorium.com/movie/1080/275584.jpg?1676328611', url: 'https://vk.com/video_ext.php?oid=-228899973&id=456239022&hd=2' },
+            { id: 'madagascar2', type: 'movie', parent: 'madagascar_fr', title: 'Мадагаскар 2', img: 'https://upload.wikimedia.org/wikipedia/ru/b/bf/Madagascar_2.jpg', url: 'https://vk.com/video_ext.php?oid=526744873&id=456241388&hd=2' },
+            { id: 'madagascar3', type: 'movie', parent: 'madagascar_fr', title: 'Мадагаскар 3', img: 'https://basket-02.wbbasket.ru/vol287/part28759/28759754/images/big/1.webp', url: 'https://vk.com/video_ext.php?oid=-230229363&id=456240695&hd=2' },
+
+            // Тролли
+            { id: 'trolls1', type: 'movie', parent: 'trolls_fr', title: 'Тролли', img: 'https://play-lh.googleusercontent.com/NIJpQJ-TvOnRMuK0iIC2TyuKp2KuLJeJXxHkEAbinBquXSCuOPpuBPtUD8wElt8gUfYd0Lp9nSfFXx-Sr5I', url: 'https://vk.com/video_ext.php?oid=-80021931&id=456243745&hd=2' },
+            { id: 'trolls2', type: 'movie', parent: 'trolls_fr', title: 'Тролли 2: Мировой Тур', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/1599028/6ff6a967-a4b4-43e9-bab1-da3029c618e4/600x900', url: 'https://vk.com/video_ext.php?oid=-230599619&id=456239134&hd=2' },
+            { id: 'trolls3', type: 'movie', parent: 'trolls_fr', title: 'Тролли 3: Группа в сборе', img: 'https://upload.wikimedia.org/wikipedia/ru/7/7c/%D0%A2%D1%80%D0%BE%D0%BB%D0%BB%D0%B8_3.jpg', url: 'https://vk.com/video_ext.php?oid=-229356529&id=456239073&hd=2' },
+
+            // Корпорация монстров
+            { id: 'monsters_inc', type: 'movie', parent: 'monsters_fr', title: 'Корпорация монстров', img: 'https://cdn.ananasposter.ru/image/cache/catalog/poster/pos23/10/62977-1000x830.jpg', url: 'https://vk.com/video_ext.php?oid=-226802088&id=456244772&hd=2' },
+            { id: 'monsters_uni', type: 'movie', parent: 'monsters_fr', title: 'Университет монстров', img: 'https://static.wikia.nocookie.net/disney/images/d/d5/%D0%A3%D0%BD%D0%B8%D0%B2%D0%B5%D1%80%D1%81%D0%B8%D1%82%D0%B5%D1%82%D0%9C%D0%BE%D0%BD%D1%81%D1%82%D1%80%D0%BE%D0%B2%D0%A0%D1%83%D1%81%D1%81%D0%BA%D0%B8%D0%B9%D0%9F%D0%BE%D1%81%D1%82%D0%B5%D1%80.jpg/revision/latest?cb=20250310130455&path-prefix=ru', url: 'https://vk.com/video_ext.php?oid=-34229261&id=456248938&hd=2' },
+
+            // Гадкий я
+            { id: 'despicable1', type: 'movie', parent: 'despicable_me_fr', title: 'Гадкий я', img: 'https://cdn.ananasposter.ru/image/cache/catalog/poster/mult/95/2313-1000x830.jpg', url: 'https://vk.com/video_ext.php?oid=-230229363&id=456242474&hd=2' },
+            { id: 'despicable2', type: 'movie', parent: 'despicable_me_fr', title: 'Гадкий я 2', img: 'https://wikimultia.org/images/thumb/2/26/Despicable_Me_2.jpg/350px-Despicable_Me_2.jpg', url: 'https://vk.com/video_ext.php?oid=821667109&id=456239119&hd=2' },
+            { id: 'despicable3', type: 'movie', parent: 'despicable_me_fr', title: 'Гадкий я 3', img: 'https://thumbs.dfs.ivi.ru/storage0/contents/9/b/4a5ffa08f847b1afa2b0f4d23e379f.jpg', url: 'https://vk.com/video_ext.php?oid=-231729433&id=456240913&hd=2' },
+            { id: 'despicable4', type: 'movie', parent: 'despicable_me_fr', title: 'Гадкий я 4', img: 'https://ir.ozone.ru/s3/multimedia-1-o/c1000/7115847360.jpg', url: 'https://vk.com/video_ext.php?oid=-209993893&id=456239157&hd=2' },
+
+            // Моана
+            { id: 'moana1', type: 'movie', parent: 'moana_fr', title: 'Моана', img: 'https://static.wikia.nocookie.net/disney/images/7/76/Moana_official_poster.jpg/revision/latest?cb=20160921035605&path-prefix=es', url: 'https://vk.com/video_ext.php?oid=-218795056&id=456239463&hd=2' },
+            { id: 'moana2', type: 'movie', parent: 'moana_fr', title: 'Моана 2', img: 'https://kino.vl.ru/kino/images/big_w1500_52965974.jpg', url: 'https://vk.com/video_ext.php?oid=397195256&id=456240212&hd=2' },
+            
+            // Головоломка
+            { id: 'inside_out1', type: 'movie', parent: 'inside_out_fr', title: 'Головоломка', img: 'https://lh3.googleusercontent.com/proxy/jY7bVSvEmw4rELdeFZOPBEP7Wh4Rd3aP-3pySNIjzEZ6oTd8Ig_xMsc7uCP9DIBEVdMJS0Z93D7YuOxsEcVS5TILHHfl1SmpAYRDogNixL632KMU', url: 'https://vk.com/video_ext.php?oid=-217081635&id=456239054&hd=2' },
+            { id: 'inside_out2', type: 'movie', parent: 'inside_out_fr', title: 'Головоломка 2', img: 'https://poster4.me/wp-content/uploads/orig-2-8.jpg', url: 'https://vk.com/video_ext.php?oid=-223243854&id=456239394&hd=2' },
+
+            // Другие
+            { id: 'frozen1', type: 'movie', parent: 'frozen_fr', title: 'Холодное сердце', img: 'https://avatars.mds.yandex.net/get-mpic/13293703/2a000001919022af1410f3799caba8e7df24/orig', url: 'https://vk.com/video_ext.php?oid=-229172274&id=456239172&hd=2' },
+            { id: 'frozen2', type: 'movie', parent: 'frozen_fr', title: 'Холодное сердце 2', img: 'https://mw.tvcom.uz/media/upload/tvmiddleware/posters/93453/pb_poster.webp', url: 'https://vk.com/video_ext.php?oid=-188008198&id=456239137&hd=2' },
+            { id: 'sing1', type: 'movie', parent: 'sing_fr', title: 'Зверопой', img: 'https://mc.lordfilm.md/uploads/posts/2019-11/1573237851-1607429732.jpg', url: 'https://vk.com/video_ext.php?oid=-233886125&id=456239020&hd=2' },
+            { id: 'sing2', type: 'movie', parent: 'sing_fr', title: 'Зверопой 2', img: 'https://static.wikia.nocookie.net/fvdxxv/images/1/19/%D0%97%D0%B2%D0%B5%D1%80%D0%BE%D0%BF%D0%BE%D0%B9_2_%282021%29.jpg/revision/latest?cb=20211122132705&path-prefix=ru', url: 'https://vk.com/video_ext.php?oid=-34229261&id=456247441&hd=2' },
+            { id: 'shrek1', type: 'movie', parent: 'shrek_fr', title: 'Шрек 1', img: 'https://upload.wikimedia.org/wikipedia/ru/3/39/Shrek.jpg', url: 'https://vk.com/video_ext.php?oid=-228669978&id=456240070&hd=2' },
+            { id: 'shrek2', type: 'movie', parent: 'shrek_fr', title: 'Шрек 2', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/1773646/27a3c989-e883-40f3-806f-f3ef27fe7177/220x330', url: 'https://vk.com/video_ext.php?oid=-228921933&id=456240437&hd=2' },
+            { id: 'shrek3', type: 'movie', parent: 'shrek_fr', title: 'Шрек Третий', img: 'https://static.wikia.nocookie.net/shrek/images/5/5d/Shrek-3-royal-i1416.jpg/revision/latest?cb=20210223193733&path-prefix=ru', url: 'https://vk.com/video_ext.php?oid=-136020824&id=456248244&hd=2' },
+            { id: 'shrek4', type: 'movie', parent: 'shrek_fr', title: 'Шрек Навсегда', img: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSkiXNyZALivfDIS8Lqe2iaM2ZsvwuH40f_HA&s', url: 'https://vk.com/video_ext.php?oid=-230098113&id=456244171&hd=2' },
+            { id: 'puss1', type: 'movie', parent: 'puss_fr', title: 'Кот в сапогах', img: 'https://upload.wikimedia.org/wikipedia/ru/e/ef/Puss-in-Boots.jpg', url: 'https://vk.com/video_ext.php?oid=-226720430&id=456239048&hd=2' },
+            { id: 'puss2', type: 'movie', parent: 'puss_fr', title: 'Кот в сапогах 2', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/4303601/19b2a831-d81b-4364-a82a-dc6ca779023f/600x900', url: 'https://vk.com/video_ext.php?oid=-223877407&id=456240065&hd=2' },
+            { id: 'zoo1', type: 'movie', parent: 'zootopia_fr', title: 'Зверополис', img: 'https://thumbs.dfs.ivi.ru/storage0/contents/d/4/2a10de073f4748962f0ac1e409bcfd.jpg', url: 'https://vk.com/video_ext.php?oid=-210006003&id=456243166&hd=2' },
+            { id: 'zoo2', type: 'movie', parent: 'zootopia_fr', title: 'Зверополис 2', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/10812607/a115270b-5380-4441-9fe4-43497d7d19a7/600x900', url: 'https://vk.com/video_ext.php?oid=133729111&id=456241459&hd=2' },
+        ];
+
+        // === СИСТЕМНАЯ ЛОГИКА ===
+        let appState = 'splash'; 
+        let activeMenuIndex = 1; 
+        let activeGridIndex = 0;
+        let currentItems = [];
+        let historyStack = []; 
+        let btnTimer;
+        
+        const menuItems = document.querySelectorAll('.menu-item');
+        const gridEl = document.getElementById('grid');
+        const closeBtn = document.getElementById('close-btn');
+
+        window.onload = () => {
+            setTimeout(() => {
+                document.getElementById('splash').style.opacity = 0;
+                setTimeout(() => {
+                    document.getElementById('splash').style.display = 'none';
+                    activateMenu(1); 
+                }, 500);
+            }, 2500);
+        };
+
+        // --- УМНАЯ КНОПКА ВЫХОДА ---
+        function showCloseButton() {
+            if (appState !== 'player') return;
+            closeBtn.classList.add('visible');
+            clearTimeout(btnTimer);
+            btnTimer = setTimeout(() => {
+                closeBtn.classList.remove('visible');
+            }, 3000);
+        }
+
+        window.addEventListener('mousemove', showCloseButton);
+        window.addEventListener('keydown', showCloseButton);
+
+        // --- ИСТОРИЯ ---
+        function addToHistory(itemId) {
+            let hist = JSON.parse(localStorage.getItem('akur_history') || '[]');
+            hist = hist.filter(id => id !== itemId);
+            hist.unshift(itemId);
+            if(hist.length > 30) hist.pop();
+            localStorage.setItem('akur_history', JSON.stringify(hist));
+        }
+
+        function loadHistory() {
+            const hist = JSON.parse(localStorage.getItem('akur_history') || '[]');
+            currentItems = hist.map(id => db.find(m => m.id === id)).filter(Boolean);
+            if(currentItems.length === 0) gridEl.innerHTML = '<div style="padding:20px; font-size:20px; color:#555;">История пуста</div>';
+            else renderGrid();
+        }
+
+        // --- МЕНЮ ---
+        function activateMenu(index) {
+            activeMenuIndex = index;
+            appState = 'menu';
+            menuItems.forEach((el, i) => {
+                el.classList.remove('active', 'focused');
+                if(i === index) el.classList.add('active');
+            });
+            renderFocus();
+
+            const action = ["search", "home", "history", "cartoons", "genres", "about"][index];
+            document.getElementById('search-box').style.display = 'none';
+            gridEl.innerHTML = '';
+            historyStack = [];
+
+            if (action === "home") {
+                document.getElementById('page-title').innerText = "Студии";
+                currentItems = db.filter(i => i.type === 'studio');
+                renderGrid();
+            } else if (action === "history") {
+                document.getElementById('page-title').innerText = "История просмотра";
+                loadHistory();
+            } else if (action === "search") {
+                document.getElementById('page-title').innerText = "Поиск";
+                document.getElementById('search-box').style.display = 'block';
+                document.getElementById('search-input').value = '';
+                setTimeout(() => document.getElementById('search-input').focus(), 100);
+            } else {
+                document.getElementById('page-title').innerText = menuItems[index].innerText;
+                gridEl.innerHTML = '<div style="padding:20px; color:#555">Раздел в разработке...</div>';
+                currentItems = [];
+            }
+        }
+
+        function renderGrid() {
+            gridEl.innerHTML = '';
+            currentItems.forEach((item, index) => {
+                const card = document.createElement('div');
+                card.className = item.type === 'studio' ? 'card studio' : 'card';
+                card.onclick = () => handleCardClick(index);
+                
+                let badge = '';
+                if(item.type === 'folder') badge = '<div class="folder-badge">КОЛЛЕКЦИЯ</div>';
+
+                card.innerHTML = `${badge}<img src="${item.img}" referrerpolicy="no-referrer" onerror="this.src='https://via.placeholder.com/300x450?text=Error'">`;
+                gridEl.appendChild(card);
+            });
+            // Не сбрасываем activeGridIndex если мы уже в поиске
+            if(appState !== 'grid' && appState !== 'player') activeGridIndex = 0;
+            renderFocus();
+        }
+
+        function handleCardClick(index) {
+            const item = currentItems[index];
+            if (item.type === 'movie') {
+                addToHistory(item.id);
+                // Если в URL уже есть параметр времени (t=), используем его
+                let playUrl = item.url;
+                if(!playUrl.includes('&t=') && !playUrl.includes('?t=')) {
+                    if(playUrl.includes('?')) playUrl += '&t=0'; else playUrl += '?t=0';
+                }
+                openPlayer(playUrl);
+            } else {
+                historyStack.push({ items: currentItems, title: document.getElementById('page-title').innerText });
+                document.getElementById('page-title').innerText = item.title;
+                currentItems = db.filter(i => i.parent === item.id);
+                renderGrid();
+                appState = 'grid';
+                activeGridIndex = 0;
+                renderFocus();
+            }
+        }
+
+        function openPlayer(url) {
+            document.getElementById('video-frame').src = url;
+            document.getElementById('player').style.display = 'block';
+            appState = 'player';
+            showCloseButton(); 
+        }
+
+        function closePlayer() {
+            const iframe = document.getElementById('video-frame');
+            iframe.src = "about:blank"; // Полный сброс
+            document.getElementById('player').style.display = 'none';
+            appState = 'grid';
+            renderFocus();
+        }
+
+        function renderFocus() {
+            menuItems.forEach(el => el.classList.remove('focused'));
+            document.querySelectorAll('.card').forEach(el => el.classList.remove('focused'));
+
+            if (appState === 'menu') {
+                menuItems[activeMenuIndex].classList.add('focused');
+            } else if (appState === 'grid' && currentItems.length > 0) {
+                const cards = document.querySelectorAll('.card');
+                if (cards[activeGridIndex]) {
+                    cards[activeGridIndex].classList.add('focused');
+                    cards[activeGridIndex].scrollIntoView({behavior: "smooth", block: "center"});
+                }
+            }
+        }
+
+        // --- УПРАВЛЕНИЕ ---
+        document.addEventListener('keydown', (e) => {
+            if (appState === 'splash') return;
+            
+            if (appState === 'player') {
+                if (e.key === 'Escape' || e.key === 'Backspace' || e.keyCode === 461 || e.keyCode === 10009) {
+                    closePlayer();
+                }
+                return;
+            }
+
+            // Управление в ПОИСКЕ
+            if (document.activeElement === document.getElementById('search-input')) {
+                if (e.key === 'ArrowDown') { 
+                    if (currentItems.length > 0) {
+                        document.getElementById('search-input').blur(); 
+                        appState = 'grid'; 
+                        activeGridIndex = 0;
+                        renderFocus(); 
+                    }
+                }
+                if (e.key === 'Enter') return;
+                return;
+            }
+
+            const key = e.key;
+
+            if (key === 'ArrowUp') {
+                if (appState === 'menu' && activeMenuIndex > 0) activeMenuIndex--;
+                else if (appState === 'grid') {
+                    if (activeGridIndex >= 4) activeGridIndex -= 4;
+                    // Если мы в поиске и идем вверх с первого ряда - возвращаемся в инпут
+                    else if (document.getElementById('search-box').style.display === 'block') {
+                        appState = 'menu'; // условно, но фокус на инпут
+                        document.getElementById('search-input').focus();
+                    }
+                }
+            } else if (key === 'ArrowDown') {
+                if (appState === 'menu' && activeMenuIndex < menuItems.length - 1) activeMenuIndex++;
+                else if (appState === 'grid' && activeGridIndex + 4 < currentItems.length) activeGridIndex += 4;
+            } else if (key === 'ArrowRight') {
+                if (appState === 'menu' && currentItems.length > 0) { appState = 'grid'; activeGridIndex = 0; }
+                else if (appState === 'grid' && activeGridIndex < currentItems.length - 1) activeGridIndex++;
+            } else if (key === 'ArrowLeft') {
+                if (appState === 'grid') {
+                    if (activeGridIndex % 4 === 0) appState = 'menu';
+                    else activeGridIndex--;
+                }
+            } else if (key === 'Enter' || e.keyCode === 13) {
+                if (appState === 'menu') activateMenu(activeMenuIndex);
+                else if (appState === 'grid') handleCardClick(activeGridIndex);
+            } else if (key === 'Backspace' || key === 'Escape' || e.keyCode === 461 || e.keyCode === 10009) {
+                if (appState === 'grid') {
+                    if (historyStack.length > 0) {
+                        const prev = historyStack.pop();
+                        currentItems = prev.items;
+                        document.getElementById('page-title').innerText = prev.title;
+                        renderGrid();
+                    } else {
+                        // Если выходим из поиска
+                        appState = 'menu';
+                        activateMenu(1); // Домой
+                    }
+                }
+            }
+            renderFocus();
+        });
+        
+        // ЛОГИКА ПОИСКА
+        document.getElementById('search-input').addEventListener('input', (e) => {
+            const val = e.target.value.toLowerCase().trim();
+            
+            if (val.length === 0) {
+                gridEl.innerHTML = '';
+                currentItems = [];
+                return;
+            }
+
+            // Ищем фильмы и папки, исключаем студии
+            currentItems = db.filter(i => {
+                const isContent = i.type === 'movie' || i.type === 'folder';
+                const isMatch = i.title.toLowerCase().includes(val);
+                return isContent && isMatch;
+            });
+
+            if (currentItems.length === 0) {
+                gridEl.innerHTML = '<div style="padding:20px; color:#777">Ничего не найдено</div>';
+            } else {
+                renderGrid();
+            }
+        });
+    </script>
+</body>
+</html>
