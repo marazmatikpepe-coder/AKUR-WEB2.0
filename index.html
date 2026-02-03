@@ -90,13 +90,15 @@
         }
         #search-input:focus { border-color: #E50914; }
 
-        /* Сетка */
+        /* === СЕТКА === */
         .grid {
             display: grid; 
-            gap: 30px; 
+            grid-template-columns: repeat(4, 1fr); 
+            row-gap: 80px;   
+            column-gap: 40px; 
             align-content: start; overflow-y: auto; 
-            padding-bottom: 250px; 
-            padding-right: 15px; padding-left: 5px; padding-top: 10px;
+            padding-bottom: 300px; 
+            padding-right: 15px; padding-left: 10px; padding-top: 20px;
             flex: 1; scroll-behavior: smooth;
         }
         .grid::-webkit-scrollbar { width: 8px; }
@@ -114,6 +116,7 @@
         .card.studio { aspect-ratio: 16/9; background: white; display: flex; align-items: center; justify-content: center; }
         .card.studio img { width: 70%; object-fit: contain; }
         
+        /* Бейджики */
         .folder-badge {
             position: absolute; top: 10px; right: 10px;
             background: rgba(229, 9, 20, 0.95); 
@@ -122,13 +125,15 @@
             box-shadow: 0 2px 5px rgba(0,0,0,0.5);
             text-transform: uppercase;
         }
-        .folder-badge.series { background: rgba(0, 113, 235, 0.95); }
+        .folder-badge.series { background: rgba(0, 113, 235, 0.95); } /* Синий */
+        .folder-badge.episode { background: rgba(0, 180, 0, 0.95); }  /* Зеленый */
 
+        /* Увеличение при наведении */
         .card:hover, .card.focused {
-            transform: scale(1.08); 
+            transform: scale(1.1); 
             border-color: white; 
-            z-index: 10;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.9);
+            z-index: 100;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.9);
         }
 
         /* === ИНФО ПАНЕЛЬ === */
@@ -188,20 +193,32 @@
         }
         #close-btn.visible { opacity: 1; border-color: white; }
 
+        /* Кнопка следующей серии */
+        #next-btn {
+            position: absolute; bottom: 50px; right: 50px;
+            background: rgba(229, 9, 20, 0.9); color: white;
+            padding: 15px 40px; border-radius: 8px; font-weight: 800; font-size: 20px;
+            cursor: pointer; z-index: 201; border: 2px solid rgba(255,255,255,0.5);
+            transition: opacity 0.3s; opacity: 0; display: none;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.8);
+        }
+        #next-btn:hover { transform: scale(1.05); background: #f00; border-color: white; }
+        #next-btn.visible { opacity: 1; }
+
     </style>
 </head>
 <body>
 
-    <!-- МУЗЫКА (Убрал loop, добавил preload) -->
+    <!-- МУЗЫКА -->
     <audio id="bg-music" preload="auto">
         <source src="https://zvukipro.com/index.php?do=download&id=49481" type="audio/mp3">
     </audio>
 
-    <!-- ЭКРАН ВЫБОРА (ТОЛЬКО 1 РАЗ) -->
+    <!-- ЭКРАН ВЫБОРА -->
     <div id="device-select-screen">
         <div class="ds-title">Выберите тип устройства</div>
         <div class="ds-buttons">
-            <div class="ds-btn" onclick="selectDevice('tv')">📺 Телевизор / ПК</div>
+            <div class="ds-btn" onclick="selectDevice('tv')">📺 ТВ / ПК</div>
             <div class="ds-btn" onclick="selectDevice('mobile')">📱 Смартфон</div>
         </div>
     </div>
@@ -215,7 +232,7 @@
         <div class="menu-item" onclick="activateMenu(2)">🕒 История</div>
         <div class="menu-item" onclick="activateMenu(3)">👶 Детям</div>
         <div class="menu-item" onclick="activateMenu(4)">🎭 Жанры</div>
-        <div class="menu-item" onclick="resetSettings()">⚙️ Сброс (Выбор ТВ)</div>
+        <div class="menu-item" onclick="resetSettings()">⚙️ Сброс</div>
     </div>
 
     <div class="content">
@@ -232,11 +249,12 @@
 
     <div id="player">
         <div id="close-btn" onclick="closePlayer()">ВЫЙТИ В МЕНЮ</div>
+        <div id="next-btn" onclick="playNext()">СЛЕДУЮЩАЯ СЕРИЯ ⏭</div>
         <iframe id="video-frame" src="" allow="autoplay; fullscreen; encrypted-media; picture-in-picture;" allowfullscreen></iframe>
     </div>
 
     <script>
-        let COLS = 6; // По умолчанию для ТВ
+        let COLS = 4; 
 
         // === БАЗА ДАННЫХ ===
         const db = [
@@ -245,131 +263,184 @@
             { id: 'disney', type: 'studio', title: 'Disney', img: 'https://upload.wikimedia.org/wikipedia/commons/3/3e/Disney%2B_logo.svg', desc: 'Волшебный мир Disney, Pixar, Marvel и Star Wars.' },
             { id: 'wb', type: 'studio', title: 'Warner Bros', img: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d2/Warner_Bros._%282019%29_logo.svg/1200px-Warner_Bros._%282019%29_logo.svg.png', desc: 'Легендарная киностудия. Гарри Поттер, DC и многое другое.' },
 
-            // --- NETFLIX ---
-            { id: 'stranger_things_folder', type: 'folder', parent: 'netflix', title: 'Очень странные дела', img: 'https://www.kinomania.ru/sites/default/files/styles/400/public/film_gallery/8a4394888248b6d62f640c76961cc0fe.jpeg?itok=mFiT-abt', year: '2016-2025', genre: 'Сериал, Ужасы', desc: 'В тихом городке исчезает мальчик. Поиски приводят к тайным экспериментам и сверхъестественным силам.' },
-            { id: 'chronicles_fr', type: 'folder', parent: 'netflix', title: 'Хроники Рождества', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/1773646/c5d96751-35fa-4dab-9f72-697aacb04b45/600x900', year: '2018-2020', genre: 'Коллекция', desc: 'Брат и сестра Кейт и Тедди Пирс пытаются доказать существование Санта-Клауса.' },
-            { id: 'klaus_m', type: 'movie', parent: 'netflix', title: 'Клаус', img: 'https://images-s.kinorium.com/movie/poster/1555565/w1500_45563041.jpg', url: 'https://vk.com/video_ext.php?oid=-223928932&id=456239034&hd=2', year: '2019', genre: 'Мультфильм, Сказка', desc: 'Владелец почтовой империи отправляет своего ленивого сына на крайний север, где тот встречает загадочного игрушечника.' },
+            // --- NETFLIX: КОРЕНЬ ---
+            { id: 'stranger_things_folder', type: 'folder', parent: 'netflix', title: 'Очень странные дела', img: 'https://www.kinomania.ru/sites/default/files/styles/400/public/film_gallery/8a4394888248b6d62f640c76961cc0fe.jpeg?itok=mFiT-abt', year: '2016-2025', genre: 'Сериал, Ужасы', desc: 'В тихом городке исчезает мальчик. Поиски приводят к тайным экспериментам.' },
+            
+            // S1
+            { id: 'st_s1', type: 'folder', parent: 'stranger_things_folder', title: 'Сезон 1', img: 'https://trikky.ru/wp-content/blogs.dir/1/files/2024/08/20/img-4181.jpeg', year: '2016', genre: 'Сериал', desc: 'Начало истории.' },
+            { id: 'st_s1_e1', type: 'movie', parent: 'st_s1', title: 'Серия 1', img: 'https://trikky.ru/wp-content/blogs.dir/1/files/2024/08/20/img-4181.jpeg', url: 'https://vk.com/video_ext.php?oid=-229712732&id=456245776&hd=2', year: 'S01', genre: 'E01', desc: 'Исчезновение Уилла Байерса.' },
+            { id: 'st_s1_e2', type: 'movie', parent: 'st_s1', title: 'Серия 2', img: 'https://trikky.ru/wp-content/blogs.dir/1/files/2024/08/20/img-4181.jpeg', url: 'https://vk.com/video_ext.php?oid=-229712732&id=456245777&hd=2', year: 'S01', genre: 'E02', desc: 'Чудачка с кленовой улицы.' },
+            { id: 'st_s1_e3', type: 'movie', parent: 'st_s1', title: 'Серия 3', img: 'https://trikky.ru/wp-content/blogs.dir/1/files/2024/08/20/img-4181.jpeg', url: 'https://vk.com/video_ext.php?oid=-227263680&id=456239514&hd=2', year: 'S01', genre: 'E03', desc: 'Рождественские огни.' },
+            { id: 'st_s1_e4', type: 'movie', parent: 'st_s1', title: 'Серия 4', img: 'https://trikky.ru/wp-content/blogs.dir/1/files/2024/08/20/img-4181.jpeg', url: 'https://vk.com/video_ext.php?oid=-227263680&id=456239515&hd=2', year: 'S01', genre: 'E04', desc: 'Тело.' },
+            { id: 'st_s1_e5', type: 'movie', parent: 'st_s1', title: 'Серия 5', img: 'https://trikky.ru/wp-content/blogs.dir/1/files/2024/08/20/img-4181.jpeg', url: 'https://vk.com/video_ext.php?oid=-227263680&id=456239516&hd=2', year: 'S01', genre: 'E05', desc: 'Блоха и акробат.' },
+            { id: 'st_s1_e6', type: 'movie', parent: 'st_s1', title: 'Серия 6', img: 'https://trikky.ru/wp-content/blogs.dir/1/files/2024/08/20/img-4181.jpeg', url: 'https://vk.com/video_ext.php?oid=-232094974&id=456239252&hd=2', year: 'S01', genre: 'E06', desc: 'Монстр.' },
+            { id: 'st_s1_e7', type: 'movie', parent: 'st_s1', title: 'Серия 7', img: 'https://trikky.ru/wp-content/blogs.dir/1/files/2024/08/20/img-4181.jpeg', url: 'https://vk.com/video_ext.php?oid=-227263680&id=456239518&hd=2', year: 'S01', genre: 'E07', desc: 'Ванна.' },
+            { id: 'st_s1_e8', type: 'movie', parent: 'st_s1', title: 'Серия 8', img: 'https://trikky.ru/wp-content/blogs.dir/1/files/2024/08/20/img-4181.jpeg', url: 'https://vk.com/video_ext.php?oid=-227263680&id=456239519&hd=2', year: 'S01', genre: 'E08', desc: 'Изнанка.' },
+
+            // S2
+            { id: 'st_s2', type: 'folder', parent: 'stranger_things_folder', title: 'Сезон 2', img: 'https://upload.wikimedia.org/wikipedia/ru/thumb/f/f7/Stranger_Things_season_2.jpg/330px-Stranger_Things_season_2.jpg', year: '2017', genre: 'Сериал', desc: 'Продолжение.' },
+            { id: 'st_s2_e1', type: 'movie', parent: 'st_s2', title: 'Серия 1', img: 'https://upload.wikimedia.org/wikipedia/ru/thumb/f/f7/Stranger_Things_season_2.jpg/330px-Stranger_Things_season_2.jpg', url: 'https://vk.com/video_ext.php?oid=-227263680&id=456239520&hd=2', year: 'S02', genre: 'E01', desc: 'Безумный Макс.' },
+            { id: 'st_s2_e2', type: 'movie', parent: 'st_s2', title: 'Серия 2', img: 'https://upload.wikimedia.org/wikipedia/ru/thumb/f/f7/Stranger_Things_season_2.jpg/330px-Stranger_Things_season_2.jpg', url: 'https://vk.com/video_ext.php?oid=-227263680&id=456239521&hd=2', year: 'S02', genre: 'E02', desc: 'Кошелек или жизнь, урод.' },
+            { id: 'st_s2_e3', type: 'movie', parent: 'st_s2', title: 'Серия 3', img: 'https://upload.wikimedia.org/wikipedia/ru/thumb/f/f7/Stranger_Things_season_2.jpg/330px-Stranger_Things_season_2.jpg', url: 'https://vk.com/video_ext.php?oid=-229328235&id=456239987&hd=2', year: 'S02', genre: 'E03', desc: 'Полливаг.' },
+            { id: 'st_s2_e4', type: 'movie', parent: 'st_s2', title: 'Серия 4', img: 'https://upload.wikimedia.org/wikipedia/ru/thumb/f/f7/Stranger_Things_season_2.jpg/330px-Stranger_Things_season_2.jpg', url: 'https://vk.com/video_ext.php?oid=-227263680&id=456239523&hd=2', year: 'S02', genre: 'E04', desc: 'Мудрый Уилл.' },
+            { id: 'st_s2_e5', type: 'movie', parent: 'st_s2', title: 'Серия 5', img: 'https://upload.wikimedia.org/wikipedia/ru/thumb/f/f7/Stranger_Things_season_2.jpg/330px-Stranger_Things_season_2.jpg', url: 'https://vk.com/video_ext.php?oid=-229712732&id=456245788&hd=2', year: 'S02', genre: 'E05', desc: 'Диг Даг.' },
+            { id: 'st_s2_e6', type: 'movie', parent: 'st_s2', title: 'Серия 6', img: 'https://upload.wikimedia.org/wikipedia/ru/thumb/f/f7/Stranger_Things_season_2.jpg/330px-Stranger_Things_season_2.jpg', url: 'https://vk.com/video_ext.php?oid=-227263680&id=456239525&hd=2', year: 'S02', genre: 'E06', desc: 'Шпион.' },
+            { id: 'st_s2_e7', type: 'movie', parent: 'st_s2', title: 'Серия 7', img: 'https://upload.wikimedia.org/wikipedia/ru/thumb/f/f7/Stranger_Things_season_2.jpg/330px-Stranger_Things_season_2.jpg', url: 'https://vk.com/video_ext.php?oid=-227263680&id=456239526&hd=2', year: 'S02', genre: 'E07', desc: 'Потерянная сестра.' },
+            { id: 'st_s2_e8', type: 'movie', parent: 'st_s2', title: 'Серия 8', img: 'https://upload.wikimedia.org/wikipedia/ru/thumb/f/f7/Stranger_Things_season_2.jpg/330px-Stranger_Things_season_2.jpg', url: 'https://vk.com/video_ext.php?oid=-227263680&id=456239527&hd=2', year: 'S02', genre: 'E08', desc: 'Истязатель разума.' },
+
+            // S3
+            { id: 'st_s3', type: 'folder', parent: 'stranger_things_folder', title: 'Сезон 3', img: 'https://upload.wikimedia.org/wikipedia/ru/5/5e/Stranger_Things_season_3.jpg', year: '2019', genre: 'Сериал', desc: 'Третий сезон.' },
+            { id: 'st_s3_e1', type: 'movie', parent: 'st_s3', title: 'Серия 1', img: 'https://upload.wikimedia.org/wikipedia/ru/5/5e/Stranger_Things_season_3.jpg', url: 'https://vk.com/video_ext.php?oid=-227263680&id=456239529&hd=2', year: 'S03', genre: 'E01', desc: 'Сьюзи, прием.' },
+            { id: 'st_s3_e2', type: 'movie', parent: 'st_s3', title: 'Серия 2', img: 'https://upload.wikimedia.org/wikipedia/ru/5/5e/Stranger_Things_season_3.jpg', url: 'https://vk.com/video_ext.php?oid=-227263680&id=456239530&hd=2', year: 'S03', genre: 'E02', desc: 'Крысы в торговом центре.' },
+            { id: 'st_s3_e3', type: 'movie', parent: 'st_s3', title: 'Серия 3', img: 'https://upload.wikimedia.org/wikipedia/ru/5/5e/Stranger_Things_season_3.jpg', url: 'https://vk.com/video_ext.php?oid=-229712732&id=456245795&hd=2', year: 'S03', genre: 'E03', desc: 'Дело о пропавшем спасателе.' },
+            { id: 'st_s3_e4', type: 'movie', parent: 'st_s3', title: 'Серия 4', img: 'https://upload.wikimedia.org/wikipedia/ru/5/5e/Stranger_Things_season_3.jpg', url: 'https://vk.com/video_ext.php?oid=-229712732&id=456245796&hd=2', year: 'S03', genre: 'E04', desc: 'Сауна.' },
+            { id: 'st_s3_e5', type: 'movie', parent: 'st_s3', title: 'Серия 5', img: 'https://upload.wikimedia.org/wikipedia/ru/5/5e/Stranger_Things_season_3.jpg', url: 'https://vk.com/video_ext.php?oid=-229712732&id=456245797&hd=2', year: 'S03', genre: 'E05', desc: 'Ободранные.' },
+            { id: 'st_s3_e6', type: 'movie', parent: 'st_s3', title: 'Серия 6', img: 'https://upload.wikimedia.org/wikipedia/ru/5/5e/Stranger_Things_season_3.jpg', url: 'https://vk.com/video_ext.php?oid=-229712732&id=456245798&hd=2', year: 'S03', genre: 'E06', desc: 'E Pluribus Unum.' },
+            { id: 'st_s3_e7', type: 'movie', parent: 'st_s3', title: 'Серия 7', img: 'https://upload.wikimedia.org/wikipedia/ru/5/5e/Stranger_Things_season_3.jpg', url: 'https://vk.com/video_ext.php?oid=-229712732&id=456245799&hd=2', year: 'S03', genre: 'E07', desc: 'Укус.' },
+            { id: 'st_s3_e8', type: 'movie', parent: 'st_s3', title: 'Серия 8', img: 'https://upload.wikimedia.org/wikipedia/ru/5/5e/Stranger_Things_season_3.jpg', url: 'https://vk.com/video_ext.php?oid=-229712732&id=456245800&hd=2', year: 'S03', genre: 'E08', desc: 'Битва в Старкорте.' },
+
+            // S4
+            { id: 'st_s4', type: 'folder', parent: 'stranger_things_folder', title: 'Сезон 4', img: 'https://ironvoice.su/uploads/poster/poster-osd.webp', year: '2022', genre: 'Сериал', desc: 'Четвертый сезон.' },
+            { id: 'st_s4_e1', type: 'movie', parent: 'st_s4', title: 'Серия 1', img: 'https://ironvoice.su/uploads/poster/poster-osd.webp', url: 'https://vk.com/video_ext.php?oid=-229712732&id=456245801&hd=2', year: 'S04', genre: 'E01', desc: 'Клуб адского пламени.' },
+            { id: 'st_s4_e2', type: 'movie', parent: 'st_s4', title: 'Серия 2', img: 'https://ironvoice.su/uploads/poster/poster-osd.webp', url: 'https://vk.com/video_ext.php?oid=-227263680&id=456239544&hd=2', year: 'S04', genre: 'E02', desc: 'Проклятие Векны.' },
+            { id: 'st_s4_e3', type: 'movie', parent: 'st_s4', title: 'Серия 3', img: 'https://ironvoice.su/uploads/poster/poster-osd.webp', url: 'https://vk.com/video_ext.php?oid=-229712732&id=456245803&hd=2', year: 'S04', genre: 'E03', desc: 'Монстр и супергерой.' },
+            { id: 'st_s4_e4', type: 'movie', parent: 'st_s4', title: 'Серия 4', img: 'https://ironvoice.su/uploads/poster/poster-osd.webp', url: 'https://vk.com/video_ext.php?oid=-229712732&id=456245804&hd=2', year: 'S04', genre: 'E04', desc: 'Дорогой Билли.' },
+            { id: 'st_s4_e5', type: 'movie', parent: 'st_s4', title: 'Серия 5', img: 'https://ironvoice.su/uploads/poster/poster-osd.webp', url: 'https://vk.com/video_ext.php?oid=-229712732&id=456245805&hd=2', year: 'S04', genre: 'E05', desc: 'Проект Нина.' },
+            { id: 'st_s4_e6', type: 'movie', parent: 'st_s4', title: 'Серия 6', img: 'https://ironvoice.su/uploads/poster/poster-osd.webp', url: 'https://vk.com/video_ext.php?oid=-229712732&id=456245806&hd=2', year: 'S04', genre: 'E06', desc: 'Прыжок.' },
+            { id: 'st_s4_e7', type: 'movie', parent: 'st_s4', title: 'Серия 7', img: 'https://ironvoice.su/uploads/poster/poster-osd.webp', url: 'https://vk.com/video_ext.php?oid=-227263680&id=456239549&hd=2', year: 'S04', genre: 'E07', desc: 'Резня в лаборатории Хоукинса.' },
+            { id: 'st_s4_e8', type: 'movie', parent: 'st_s4', title: 'Серия 8', img: 'https://ironvoice.su/uploads/poster/poster-osd.webp', url: 'https://vk.com/video_ext.php?oid=-227263680&id=456239550&hd=2', year: 'S04', genre: 'E08', desc: 'Папа.' },
+
+            // S5
+            { id: 'st_s5', type: 'folder', parent: 'stranger_things_folder', title: 'Сезон 5', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/10703859/1e653cad-c84f-4617-b61e-949b3228ef36/220x330', year: '2025', genre: 'Сериал', desc: 'Финальный сезон.' },
+            { id: 'st_s5_e1', type: 'movie', parent: 'st_s5', title: 'Серия 1', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/10703859/1e653cad-c84f-4617-b61e-949b3228ef36/220x330', url: 'https://vk.com/video_ext.php?oid=588164737&id=456239948&hd=2', year: 'S05', genre: 'E01', desc: 'Глава 1.' },
+            { id: 'st_s5_e2', type: 'movie', parent: 'st_s5', title: 'Серия 2', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/10703859/1e653cad-c84f-4617-b61e-949b3228ef36/220x330', url: 'https://vk.com/video_ext.php?oid=-232934745&id=456239265&hd=2', year: 'S05', genre: 'E02', desc: 'Глава 2.' },
+            { id: 'st_s5_e3', type: 'movie', parent: 'st_s5', title: 'Серия 3', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/10703859/1e653cad-c84f-4617-b61e-949b3228ef36/220x330', url: 'https://vk.com/video_ext.php?oid=588164737&id=456239950&hd=2', year: 'S05', genre: 'E03', desc: 'Глава 3.' },
+            { id: 'st_s5_e4', type: 'movie', parent: 'st_s5', title: 'Серия 4', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/10703859/1e653cad-c84f-4617-b61e-949b3228ef36/220x330', url: 'https://vk.com/video_ext.php?oid=588164737&id=456239951&hd=2', year: 'S05', genre: 'E04', desc: 'Глава 4.' },
+            { id: 'st_s5_e5', type: 'movie', parent: 'st_s5', title: 'Серия 5', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/10703859/1e653cad-c84f-4617-b61e-949b3228ef36/220x330', url: 'https://vk.com/video_ext.php?oid=-34229261&id=456252180&hd=2', year: 'S05', genre: 'E05', desc: 'Глава 5.' },
+            { id: 'st_s5_e6', type: 'movie', parent: 'st_s5', title: 'Серия 6', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/10703859/1e653cad-c84f-4617-b61e-949b3228ef36/220x330', url: 'https://vk.com/video_ext.php?oid=-232934745&id=456239423&hd=2', year: 'S05', genre: 'E06', desc: 'Глава 6.' },
+            { id: 'st_s5_e7', type: 'movie', parent: 'st_s5', title: 'Серия 7', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/10703859/1e653cad-c84f-4617-b61e-949b3228ef36/220x330', url: 'https://vk.com/video_ext.php?oid=-34229261&id=456252181&hd=2', year: 'S05', genre: 'E07', desc: 'Глава 7.' },
+            { id: 'st_s5_e8', type: 'movie', parent: 'st_s5', title: 'Серия 8', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/10703859/1e653cad-c84f-4617-b61e-949b3228ef36/220x330', url: 'https://vk.com/video_ext.php?oid=-34229261&id=456252285&hd=2', year: 'S05', genre: 'E08', desc: 'Глава 8.' },
+
+            // --- NETFLIX: WEDNESDAY ---
+            { id: 'wednesday_series', type: 'folder', parent: 'netflix', title: 'Уэнсдей', img: 'https://upload.wikimedia.org/wikipedia/ru/thumb/b/b2/%D0%A3%D1%8D%D0%BD%D1%81%D0%B4%D0%B5%D0%B9%D0%9F%D0%BE%D1%81%D1%82%D0%B5%D1%80.jpg/330px-%D0%A3%D1%8D%D0%BD%D1%81%D0%B4%D0%B5%D0%B9%D0%9F%D0%BE%D1%81%D1%82%D0%B5%D1%80.jpg', year: '2022-2025', genre: 'Сериал, Фэнтези', desc: 'Умная, саркастичная и немного мертвая в душе Уэнсдэй Аддамс расследует убийства и заводит новых друзей и врагов в академии «Невермор».' },
+
+            // S1
+            { id: 'wed_s1', type: 'folder', parent: 'wednesday_series', title: 'Сезон 1', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/4483445/edb46841-5649-4462-be63-6dd5bf3da947/600x900', year: '2022', genre: 'Сериал', desc: 'Первый сезон.' },
+            { id: 'wed_s1_e1', type: 'movie', parent: 'wed_s1', title: 'Серия 1', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/4483445/edb46841-5649-4462-be63-6dd5bf3da947/600x900', url: 'https://vk.com/video_ext.php?oid=-183251793&id=456240392&hd=2', year: 'S01', genre: 'E01', desc: 'То, что нас не убивает.' },
+            { id: 'wed_s1_e2', type: 'movie', parent: 'wed_s1', title: 'Серия 2', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/4483445/edb46841-5649-4462-be63-6dd5bf3da947/600x900', url: 'https://vk.com/video_ext.php?oid=-183251793&id=456240396&hd=2', year: 'S01', genre: 'E02', desc: 'Самый одинокий номер.' },
+            { id: 'wed_s1_e3', type: 'movie', parent: 'wed_s1', title: 'Серия 3', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/4483445/edb46841-5649-4462-be63-6dd5bf3da947/600x900', url: 'https://vk.com/video_ext.php?oid=-232484375&id=456239104&hd=2', year: 'S01', genre: 'E03', desc: 'Друг или враг.' },
+            { id: 'wed_s1_e4', type: 'movie', parent: 'wed_s1', title: 'Серия 4', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/4483445/edb46841-5649-4462-be63-6dd5bf3da947/600x900', url: 'https://vk.com/video_ext.php?oid=-232484375&id=456239116&hd=2', year: 'S01', genre: 'E04', desc: 'Какая ночь для танцев.' },
+            { id: 'wed_s1_e5', type: 'movie', parent: 'wed_s1', title: 'Серия 5', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/4483445/edb46841-5649-4462-be63-6dd5bf3da947/600x900', url: 'https://vk.com/video_ext.php?oid=-232484375&id=456239117&hd=2', year: 'S01', genre: 'E05', desc: 'Кто посеял ветер.' },
+            { id: 'wed_s1_e6', type: 'movie', parent: 'wed_s1', title: 'Серия 6', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/4483445/edb46841-5649-4462-be63-6dd5bf3da947/600x900', url: 'https://vk.com/video_ext.php?oid=-232484375&id=456239118&hd=2', year: 'S01', genre: 'E06', desc: 'Услуга за услугу.' },
+            { id: 'wed_s1_e7', type: 'movie', parent: 'wed_s1', title: 'Серия 7', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/4483445/edb46841-5649-4462-be63-6dd5bf3da947/600x900', url: 'https://vk.com/video_ext.php?oid=-232484375&id=456239119&hd=2', year: 'S01', genre: 'E07', desc: 'Если ты меня еще не знаешь.' },
+            { id: 'wed_s1_e8', type: 'movie', parent: 'wed_s1', title: 'Серия 8', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/4483445/edb46841-5649-4462-be63-6dd5bf3da947/600x900', url: 'https://vk.com/video_ext.php?oid=-232484375&id=456239120&hd=2', year: 'S01', genre: 'E08', desc: 'Убийство в ночи.' },
+
+            // S2
+            { id: 'wed_s2', type: 'folder', parent: 'wednesday_series', title: 'Сезон 2', img: 'https://img.championat.com/i/k/l/1756309632122960924.jpg', year: '2025', genre: 'Сериал', desc: 'Второй сезон.' },
+            { id: 'wed_s2_e1', type: 'movie', parent: 'wed_s2', title: 'Серия 1', img: 'https://img.championat.com/i/k/l/1756309632122960924.jpg', url: 'https://vk.com/video_ext.php?oid=-232484375&id=456239121&hd=2', year: 'S02', genre: 'E01', desc: 'Возвращение.' },
+            { id: 'wed_s2_e2', type: 'movie', parent: 'wed_s2', title: 'Серия 2', img: 'https://img.championat.com/i/k/l/1756309632122960924.jpg', url: 'https://vk.com/video_ext.php?oid=-233273830&id=456239032&hd=2', year: 'S02', genre: 'E02', desc: 'Тайны прошлого.' },
+            { id: 'wed_s2_e3', type: 'movie', parent: 'wed_s2', title: 'Серия 3', img: 'https://img.championat.com/i/k/l/1756309632122960924.jpg', url: 'https://vk.com/video_ext.php?oid=-232484375&id=456239123&hd=2', year: 'S02', genre: 'E03', desc: 'Новые угрозы.' },
+            { id: 'wed_s2_e4', type: 'movie', parent: 'wed_s2', title: 'Серия 4', img: 'https://img.championat.com/i/k/l/1756309632122960924.jpg', url: 'https://vk.com/video_ext.php?oid=-232484375&id=456239124&hd=2', year: 'S02', genre: 'E04', desc: 'Семейные узы.' },
+            { id: 'wed_s2_e5', type: 'movie', parent: 'wed_s2', title: 'Серия 5', img: 'https://img.championat.com/i/k/l/1756309632122960924.jpg', url: 'https://vk.com/video_ext.php?oid=-232484375&id=456239128&hd=2', year: 'S02', genre: 'E05', desc: 'Темная академия.' },
+            { id: 'wed_s2_e6', type: 'movie', parent: 'wed_s2', title: 'Серия 6', img: 'https://img.championat.com/i/k/l/1756309632122960924.jpg', url: 'https://vk.com/video_ext.php?oid=-232484375&id=456239129&hd=2', year: 'S02', genre: 'E06', desc: 'Кровавая луна.' },
+            { id: 'wed_s2_e7', type: 'movie', parent: 'wed_s2', title: 'Серия 7', img: 'https://img.championat.com/i/k/l/1756309632122960924.jpg', url: 'https://vk.com/video_ext.php?oid=-232484375&id=456239137&hd=2', year: 'S02', genre: 'E07', desc: 'Предательство.' },
+            { id: 'wed_s2_e8', type: 'movie', parent: 'wed_s2', title: 'Серия 8', img: 'https://img.championat.com/i/k/l/1756309632122960924.jpg', url: 'https://vk.com/video_ext.php?oid=-232484375&id=456239138&hd=2', year: 'S02', genre: 'E08', desc: 'Финал.' },
+
+            // --- NETFLIX: SQUID GAME ---
+            { id: 'squid_game_series', type: 'folder', parent: 'netflix', title: 'Игра в кальмара', img: 'https://static.wikia.nocookie.net/squid-game/images/2/20/%D0%9F%D0%BE%D1%81%D1%82%D0%B5%D1%80_1_%D1%81%D0%B5%D0%B7%D0%BE%D0%BD.jpg/revision/latest?cb=20211105105205&path-prefix=ru', year: '2021-2025', genre: 'Сериал, Триллер', desc: 'Сотни игроков, испытывающих финансовые трудности, принимают странное приглашение участвовать в детских играх. Приз заманчив, но ставки смертельно высоки.' },
+
+            // SG S1
+            { id: 'sg_s1', type: 'folder', parent: 'squid_game_series', title: 'Сезон 1', img: 'https://static.wikia.nocookie.net/squid-game/images/2/20/%D0%9F%D0%BE%D1%81%D1%82%D0%B5%D1%80_1_%D1%81%D0%B5%D0%B7%D0%BE%D0%BD.jpg/revision/latest?cb=20211105105205&path-prefix=ru', year: '2021', genre: 'Сериал', desc: 'Красный свет, Зеленый свет.' },
+            { id: 'sg_s1_e1', type: 'movie', parent: 'sg_s1', title: 'Серия 1', img: 'https://static.wikia.nocookie.net/squid-game/images/2/20/%D0%9F%D0%BE%D1%81%D1%82%D0%B5%D1%80_1_%D1%81%D0%B5%D0%B7%D0%BE%D0%BD.jpg/revision/latest?cb=20211105105205&path-prefix=ru', url: 'https://vk.com/video_ext.php?oid=-231411365&id=456239256&hd=2', year: 'S01', genre: 'E01', desc: 'Тише едешь — дальше будешь.' },
+            { id: 'sg_s1_e2', type: 'movie', parent: 'sg_s1', title: 'Серия 2', img: 'https://static.wikia.nocookie.net/squid-game/images/2/20/%D0%9F%D0%BE%D1%81%D1%82%D0%B5%D1%80_1_%D1%81%D0%B5%D0%B7%D0%BE%D0%BD.jpg/revision/latest?cb=20211105105205&path-prefix=ru', url: 'https://vk.com/video_ext.php?oid=-233273830&id=456239055&hd=2', year: 'S01', genre: 'E02', desc: 'Ад.' },
+            { id: 'sg_s1_e3', type: 'movie', parent: 'sg_s1', title: 'Серия 3', img: 'https://static.wikia.nocookie.net/squid-game/images/2/20/%D0%9F%D0%BE%D1%81%D1%82%D0%B5%D1%80_1_%D1%81%D0%B5%D0%B7%D0%BE%D0%BD.jpg/revision/latest?cb=20211105105205&path-prefix=ru', url: 'https://vk.com/video_ext.php?oid=-234262892&id=456249136&hd=2', year: 'S01', genre: 'E03', desc: 'Человек с зонтом.' },
+            { id: 'sg_s1_e4', type: 'movie', parent: 'sg_s1', title: 'Серия 4', img: 'https://static.wikia.nocookie.net/squid-game/images/2/20/%D0%9F%D0%BE%D1%81%D1%82%D0%B5%D1%80_1_%D1%81%D0%B5%D0%B7%D0%BE%D0%BD.jpg/revision/latest?cb=20211105105205&path-prefix=ru', url: 'https://vk.com/video_ext.php?oid=-234262892&id=456249184&hd=2', year: 'S01', genre: 'E04', desc: 'Не покидай команду.' },
+            { id: 'sg_s1_e5', type: 'movie', parent: 'sg_s1', title: 'Серия 5', img: 'https://static.wikia.nocookie.net/squid-game/images/2/20/%D0%9F%D0%BE%D1%81%D1%82%D0%B5%D1%80_1_%D1%81%D0%B5%D0%B7%D0%BE%D0%BD.jpg/revision/latest?cb=20211105105205&path-prefix=ru', url: 'https://vk.com/video_ext.php?oid=-234262892&id=456245399&hd=2', year: 'S01', genre: 'E05', desc: 'Справедливый мир.' },
+            { id: 'sg_s1_e6', type: 'movie', parent: 'sg_s1', title: 'Серия 6', img: 'https://static.wikia.nocookie.net/squid-game/images/2/20/%D0%9F%D0%BE%D1%81%D1%82%D0%B5%D1%80_1_%D1%81%D0%B5%D0%B7%D0%BE%D0%BD.jpg/revision/latest?cb=20211105105205&path-prefix=ru', url: 'https://vk.com/video_ext.php?oid=-232935590&id=456239030&hd=2', year: 'S01', genre: 'E06', desc: 'Кганбу.' },
+            { id: 'sg_s1_e7', type: 'movie', parent: 'sg_s1', title: 'Серия 7', img: 'https://static.wikia.nocookie.net/squid-game/images/2/20/%D0%9F%D0%BE%D1%81%D1%82%D0%B5%D1%80_1_%D1%81%D0%B5%D0%B7%D0%BE%D0%BD.jpg/revision/latest?cb=20211105105205&path-prefix=ru', url: 'https://vk.com/video_ext.php?oid=-234262892&id=456250220&hd=2', year: 'S01', genre: 'E07', desc: 'ВИПы.' },
+            { id: 'sg_s1_e8', type: 'movie', parent: 'sg_s1', title: 'Серия 8', img: 'https://static.wikia.nocookie.net/squid-game/images/2/20/%D0%9F%D0%BE%D1%81%D1%82%D0%B5%D1%80_1_%D1%81%D0%B5%D0%B7%D0%BE%D0%BD.jpg/revision/latest?cb=20211105105205&path-prefix=ru', url: 'https://vk.com/video_ext.php?oid=-231712794&id=456239057&hd=2', year: 'S01', genre: 'E08', desc: 'Ведущий.' },
+            { id: 'sg_s1_e9', type: 'movie', parent: 'sg_s1', title: 'Серия 9', img: 'https://static.wikia.nocookie.net/squid-game/images/2/20/%D0%9F%D0%BE%D1%81%D1%82%D0%B5%D1%80_1_%D1%81%D0%B5%D0%B7%D0%BE%D0%BD.jpg/revision/latest?cb=20211105105205&path-prefix=ru', url: 'https://vk.com/video_ext.php?oid=-234262892&id=456250037&hd=2', year: 'S01', genre: 'E09', desc: 'Один удачный день.' },
+
+            // SG S2
+            { id: 'sg_s2', type: 'folder', parent: 'squid_game_series', title: 'Сезон 2', img: 'https://avatars.mds.yandex.net/get-mpic/4615396/2a0000019458d087c64940eb00c9edab5784/orig', year: '2024', genre: 'Сериал', desc: 'Игра продолжается.' },
+            { id: 'sg_s2_e1', type: 'movie', parent: 'sg_s2', title: 'Серия 1', img: 'https://avatars.mds.yandex.net/get-mpic/4615396/2a0000019458d087c64940eb00c9edab5784/orig', url: 'https://vk.com/video_ext.php?oid=-233273830&id=456239063&hd=2', year: 'S02', genre: 'E01', desc: 'Хлеб и молоко.' },
+            { id: 'sg_s2_e2', type: 'movie', parent: 'sg_s2', title: 'Серия 2', img: 'https://avatars.mds.yandex.net/get-mpic/4615396/2a0000019458d087c64940eb00c9edab5784/orig', url: 'https://vk.com/video_ext.php?oid=-198329510&id=456245988&hd=2', year: 'S02', genre: 'E02', desc: 'Не надо причинять боль.' },
+            { id: 'sg_s2_e3', type: 'movie', parent: 'sg_s2', title: 'Серия 3', img: 'https://avatars.mds.yandex.net/get-mpic/4615396/2a0000019458d087c64940eb00c9edab5784/orig', url: 'https://vk.com/video_ext.php?oid=-233273830&id=456239065&hd=2', year: 'S02', genre: 'E03', desc: 'Даже самый сильный человек.' },
+            { id: 'sg_s2_e4', type: 'movie', parent: 'sg_s2', title: 'Серия 4', img: 'https://avatars.mds.yandex.net/get-mpic/4615396/2a0000019458d087c64940eb00c9edab5784/orig', url: 'https://vk.com/video_ext.php?oid=-233273830&id=456239066&hd=2', year: 'S02', genre: 'E04', desc: 'У всех есть татуировка.' },
+            { id: 'sg_s2_e5', type: 'movie', parent: 'sg_s2', title: 'Серия 5', img: 'https://avatars.mds.yandex.net/get-mpic/4615396/2a0000019458d087c64940eb00c9edab5784/orig', url: 'https://vk.com/video_ext.php?oid=-233273830&id=456239067&hd=2', year: 'S02', genre: 'E05', desc: 'Сделай это.' },
+            { id: 'sg_s2_e6', type: 'movie', parent: 'sg_s2', title: 'Серия 6', img: 'https://avatars.mds.yandex.net/get-mpic/4615396/2a0000019458d087c64940eb00c9edab5784/orig', url: 'https://vk.com/video_ext.php?oid=-233273830&id=456239068&hd=2', year: 'S02', genre: 'E06', desc: 'Номер 456.' },
+            { id: 'sg_s2_e7', type: 'movie', parent: 'sg_s2', title: 'Серия 7', img: 'https://avatars.mds.yandex.net/get-mpic/4615396/2a0000019458d087c64940eb00c9edab5784/orig', url: 'https://vk.com/video_ext.php?oid=-233273830&id=456239069&hd=2', year: 'S02', genre: 'E07', desc: 'Друг.' },
+
+            // SG S3
+            { id: 'sg_s3', type: 'folder', parent: 'squid_game_series', title: 'Сезон 3', img: 'https://avatars.mds.yandex.net/get-mpic/12219175/2a00000197be5060b2494ce148ccbfbecce2/orig', year: '2025', genre: 'Сериал', desc: 'Финал.' },
+            { id: 'sg_s3_e1', type: 'movie', parent: 'sg_s3', title: 'Серия 1', img: 'https://avatars.mds.yandex.net/get-mpic/12219175/2a00000197be5060b2494ce148ccbfbecce2/orig', url: 'https://vk.com/video_ext.php?oid=-234262892&id=456249963&hd=2', year: 'S03', genre: 'E01', desc: 'Игра 1.' },
+            { id: 'sg_s3_e2', type: 'movie', parent: 'sg_s3', title: 'Серия 2', img: 'https://avatars.mds.yandex.net/get-mpic/12219175/2a00000197be5060b2494ce148ccbfbecce2/orig', url: 'https://vk.com/video_ext.php?oid=-217782898&id=456243696&hd=2', year: 'S03', genre: 'E02', desc: 'Игра 2.' },
+            { id: 'sg_s3_e3', type: 'movie', parent: 'sg_s3', title: 'Серия 3', img: 'https://avatars.mds.yandex.net/get-mpic/12219175/2a00000197be5060b2494ce148ccbfbecce2/orig', url: 'https://vk.com/video_ext.php?oid=-217782898&id=456243697&hd=2', year: 'S03', genre: 'E03', desc: 'Игра 3.' },
+            { id: 'sg_s3_e4', type: 'movie', parent: 'sg_s3', title: 'Серия 4', img: 'https://avatars.mds.yandex.net/get-mpic/12219175/2a00000197be5060b2494ce148ccbfbecce2/orig', url: 'https://vk.com/video_ext.php?oid=-217782898&id=456243698&hd=2', year: 'S03', genre: 'E04', desc: 'Игра 4.' },
+            { id: 'sg_s3_e5', type: 'movie', parent: 'sg_s3', title: 'Серия 5', img: 'https://avatars.mds.yandex.net/get-mpic/12219175/2a00000197be5060b2494ce148ccbfbecce2/orig', url: 'https://vk.com/video_ext.php?oid=-217782898&id=456243702&hd=2', year: 'S03', genre: 'E05', desc: 'Игра 5.' },
+            { id: 'sg_s3_e6', type: 'movie', parent: 'sg_s3', title: 'Серия 6', img: 'https://avatars.mds.yandex.net/get-mpic/12219175/2a00000197be5060b2494ce148ccbfbecce2/orig', url: 'https://vk.com/video_ext.php?oid=-217782898&id=456243703&hd=2', year: 'S03', genre: 'E06', desc: 'Финал.' },
+
+            { id: 'chronicles_fr', type: 'folder', parent: 'netflix', title: 'Хроники Рождества', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/1773646/c5d96751-35fa-4dab-9f72-697aacb04b45/600x900', year: '2018-2020', genre: 'Франшиза', desc: 'Брат и сестра Кейт и Тедди Пирс пытаются доказать существование Санта-Клауса.' },
+            { id: 'klaus_m', type: 'movie', parent: 'netflix', title: 'Клаус', img: 'https://images-s.kinorium.com/movie/poster/1555565/w1500_45563041.jpg', url: 'https://vk.com/video_ext.php?oid=-223928932&id=456239034&hd=2', year: '2019', genre: 'Мультфильм, Сказка', desc: 'Молодой почтальон находит дружбу с нелюдимым мастером игрушек Клаусом.' },
             { id: 'boy_christmas_m', type: 'movie', parent: 'netflix', title: 'Мальчик по имени Рождество', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/4774061/fd23e643-2ee0-4e31-ba6a-8c1960b695e8/600x900', url: 'https://vk.com/video_ext.php?oid=-191959649&id=456241188&hd=2', year: '2021', genre: 'Фэнтези', desc: 'Юный Николас отправляется на поиски отца в легендарную эльфийскую деревню.' },
 
-            // --- DISNEY (Главная: Фильмы и Папки) ---
-            { id: 'ozzy_m', type: 'movie', parent: 'disney', title: 'Большой собачий побег', img: 'https://upload.wikimedia.org/wikipedia/ru/5/5d/Ozzy.jpeg', url: 'https://vk.com/video_ext.php?oid=211161062&id=456241379&hd=2', year: '2016', genre: 'Мультфильм', desc: 'Бигль Оззи попадает в собачью тюрьму вместо спа-отеля и планирует побег.' },
-            { id: 'cats_m', type: 'movie', parent: 'disney', title: 'Большой кошачий побег', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/4774061/9dcd51d0-bf75-49bb-b75e-76b9a4a8522e/600x900', url: 'https://vk.com/video_ext.php?oid=-212926427&id=456246051&hd=2', year: '2018', genre: 'Мультфильм', desc: 'Домашний кот Пухляш отправляется в путешествие, чтобы найти своего сына.' },
-            { id: 'ballerina_m', type: 'movie', parent: 'disney', title: 'Балерина', img: 'https://sun9-78.userapi.com/impg/CUEEhZcvL9cyvRaN8DmgfikSYnur11Y0E9dFWA/PbBmV5BNEro.jpg?size=1080x1620&quality=95&sign=6f26d5b304ee53d586964cb2cc49050f&type=album', url: 'https://vk.com/video_ext.php?oid=-226802088&id=456262255&hd=2', year: '2016', genre: 'Мультфильм', desc: 'Сиротка Фелис сбегает в Париж, чтобы стать балериной в Гранд-опера.' },
-            { id: 'nutcracker_m', type: 'movie', parent: 'disney', title: 'Щелкунчик и 4 королевства', img: 'https://upload.wikimedia.org/wikipedia/ru/a/ae/The_Nutcracker_and_the_Four_Realms_UK_Teaser_Poster.jpg', url: 'https://vk.com/video_ext.php?oid=-218751470&id=456239063&hd=2', year: '2018', genre: 'Фэнтези', desc: 'Клара попадает в волшебный мир, где ей предстоит сразиться с Мышиным королем.' },
-            { id: 'grinch_m', type: 'movie', parent: 'disney', title: 'Гринч', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/4303601/e3163c1e-f5cc-431f-b5e6-a9d65ae45b2f/600x900', url: 'https://vk.com/video_ext.php?oid=-230016454&id=456239184&hd=2', year: '2018', genre: 'Мультфильм', desc: 'Зеленый ворчун Гринч ненавидит Рождество и решает украсть праздник.' },
-            { id: 'arthur_m', type: 'movie', parent: 'disney', title: 'Секретная служба Санта-Клауса', img: 'https://img.mvideo.ru/Big/400356222bb.jpg', url: 'https://vk.com/video_ext.php?oid=-229028113&id=456239613&hd=2', year: '2011', genre: 'Мультфильм', desc: 'Младший сын Санта-Клауса Артур отправляется доставить забытый подарок.' },
-            { id: 'soul_m', type: 'movie', parent: 'disney', title: 'Душа', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/4774061/ce2e470c-861c-4995-b6b1-54e1dd4932d4/600x900', url: 'https://vk.com/video_ext.php?oid=-113738745&id=456239237&hd=2', year: '2020', genre: 'Мультфильм', desc: 'Музыкант Джо попадает в мир душ и помогает душе 22 найти искру жизни.' },
-            { id: 'luck_m', type: 'movie', parent: 'disney', title: 'Удача', img: 'https://cs12.pikabu.ru/post_img/big/2022/11/01/7/1667301063171268378.png', url: 'https://vk.com/video_ext.php?oid=-221472934&id=456239181&hd=2', year: '2022', genre: 'Мультфильм', desc: 'Самая невезучая девушка в мире находит волшебную монету.' },
-            { id: 'cruella_m', type: 'movie', parent: 'disney', title: 'Круэлла', img: 'https://gorodarmavir.ru/upload/iblock/fd9/fd903079c311b3d4122634ddf5842706.jpg', url: 'https://vk.com/video_ext.php?oid=-104639606&id=456239489&hd=2', year: '2021', genre: 'Комедия', desc: 'История становления легендарной злодейки Круэллы де Виль.' },
-            { id: 'guardians_m', type: 'movie', parent: 'disney', title: 'Хранитель снов', img: 'https://www.kino-teatr.ru/movie/posters/big/2/0/99502.jpg', url: 'https://vk.com/video_ext.php?oid=-80021931&id=456244537&hd=2', year: '2012', genre: 'Мультфильм', desc: 'Санта, Пасхальный кролик и Зубная фея объединяются против Кромешника.' },
-            { id: 'ferdinand_m', type: 'movie', parent: 'disney', title: 'Фердинанд', img: 'https://upload.wikimedia.org/wikipedia/ru/b/be/%D0%A4%D0%B5%D1%80%D0%B4%D0%B8%D0%BD%D0%B0%D0%BD%D0%B4_%28%D0%BC%D1%83%D0%BB%D1%8C%D1%82%D1%84%D0%B8%D0%BB%D1%8C%D0%BC%29.webp', url: 'https://vk.com/video_ext.php?oid=-231729433&id=456240806&hd=2', year: '2017', genre: 'Мультфильм', desc: 'Добродушный бык Фердинанд по ошибке попадает на корриду.' },
-            { id: 'elio_m', type: 'movie', parent: 'disney', title: 'Элио', img: 'https://a113.ru/upload/resize_cache/iblock/183/rx0iqlf4pcu7om0rfbsvg3ml3wo2508j/270_404_2/nalnape222.jpg', url: 'https://vk.com/video_ext.php?oid=824810750&id=456248203&hd=2', year: '2025', genre: 'Мультфильм', desc: 'Мальчик Элио случайно телепортируется через всю галактику и становится послом Земли.' },
-            { id: 'red_m', type: 'movie', parent: 'disney', title: 'Я краснею', img: 'https://ic.pics.livejournal.com/iragaran/90735419/3201/3201_760.jpg', url: 'https://vk.com/video_ext.php?oid=-198824496&id=456239383&hd=2', year: '2022', genre: 'Мультфильм', desc: 'Уверенная в себе Мэй Ли превращается в огромную красную панду, когда волнуется.' },
-            { id: 'elemental_m', type: 'movie', parent: 'disney', title: 'Элементарно', img: 'https://www.kinonews.ru/insimgs/2023/poster/poster116531_3.webp', url: 'https://vk.com/video_ext.php?oid=-186212523&id=456239030&hd=2', year: '2023', genre: 'Мультфильм', desc: 'В городе стихий Эмбер (огонь) и Уэйд (вода) узнают, что у них много общего, несмотря на различия.' },
-            { id: 'mune_m', type: 'movie', parent: 'disney', title: 'Хранитель луны', img: 'https://upload.wikimedia.org/wikipedia/ru/e/e2/%D0%A5%D1%80%D0%B0%D0%BD%D0%B8%D1%82%D0%B5%D0%BB%D1%8C_%D0%9B%D1%83%D0%BD%D1%8B_%282014%29.jpg', url: 'https://vk.com/video_ext.php?oid=-23712274&id=456240556&hd=2', year: '2014', genre: 'Мультфильм', desc: 'Фавн Мьюн должен вернуть украденное Солнце, чтобы восстановить баланс дня и ночи.' },
-            { id: 'encanto_m', type: 'movie', parent: 'disney', title: 'Энканто', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/4303601/fab75458-dd2e-4861-8668-f591da4f61c4/220x330', url: 'https://vk.com/video_ext.php?oid=-218463181&id=456239543&hd=2', year: '2021', genre: 'Мультфильм', desc: 'Единственная в семье Мадригаль без магического дара, Мирабель пытается спасти магию своего дома.' },
-            { id: 'raya_m', type: 'movie', parent: 'disney', title: 'Райя и последний дракон', img: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQTOPH3Bzl2C2kQIPu_SwYTMqqtoIs2E5HrQkDDIrSB3N4f3FulHuYDKmH5EvBKgTpNtG7XLVBBVx-bjUCQLj1yR9FPfEapZpt9m-3QtQ&s=10', url: 'https://vk.com/video_ext.php?oid=-226802088&id=456244894&hd=2', year: '2021', genre: 'Мультфильм', desc: 'Воительница Райя ищет последнего дракона, чтобы объединить разрозненные земли Кумандры.' },
-            { id: 'onward_m', type: 'movie', parent: 'disney', title: 'Вперёд', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/1946459/442dc4a0-a101-46aa-aa9f-79678f92a5d7/600x900', url: 'https://vk.com/video_ext.php?oid=-80021931&id=456243686&hd=2', year: '2020', genre: 'Мультфильм', desc: 'Два брата-эльфа используют магию, чтобы провести один день с покойным отцом.' },
-            { id: 'coco_m', type: 'movie', parent: 'disney', title: 'Тайна Коко', img: 'https://upload.wikimedia.org/wikipedia/ru/d/d7/Coco_%282017_film%29_logo.jpg', url: 'https://vk.com/video_ext.php?oid=-230447797&id=456239035&hd=2', year: '2017', genre: 'Мультфильм', desc: 'Мальчик Мигель попадает в Страну Мертвых, чтобы получить благословение своего предка-музыканта.' },
-            { id: 'luca_m', type: 'movie', parent: 'disney', title: 'Лука', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/4483445/6ad6cf7f-c95e-48b1-9949-ccf0c29b8f7d/220x330', url: 'https://vk.com/video_ext.php?oid=-217081635&id=456239240&hd=2', year: '2021', genre: 'Мультфильм', desc: 'Морское чудовище Лука проводит незабываемое лето в итальянском городке в облике человека.' },
-            { id: 'pets_fr', type: 'folder', parent: 'disney', title: 'Тайная жизнь домашних животных', img: 'https://upload.wikimedia.org/wikipedia/ru/5/58/%D0%A2%D0%B0%D0%B9%D0%BD%D0%B0%D1%8F_%D0%B6%D0%B8%D0%B7%D0%BD%D1%8C_%D0%B4%D0%BE%D0%BC%D0%B0%D1%88%D0%BD%D0%B8%D1%85_%D0%B6%D0%B8%D0%B2%D0%BE%D1%82%D0%BD%D1%8B%D1%85_%28%D0%BF%D0%BE%D1%81%D1%82%D0%B5%D1%80%29.jpg', year: '2016-2019', genre: 'Коллекция', desc: 'Что делают питомцы, пока нас нет дома.' },
-            { id: 'nemo_fr', type: 'folder', parent: 'disney', title: 'В поисках Немо', img: 'https://avatars.mds.yandex.net/get-mpic/4252138/2a000001920543d91b32e518f84c0c20c1e5/orig', year: '2003-2016', genre: 'Коллекция', desc: 'Путешествие через океан в поисках сына.' },
-            { id: 'madagascar_fr', type: 'folder', parent: 'disney', title: 'Мадагаскар', img: 'https://upload.wikimedia.org/wikipedia/ru/thumb/2/28/Madagascar_film.jpg/330px-Madagascar_film.jpg', year: '2005-2012', genre: 'Коллекция', desc: 'Звери из зоопарка попадают в дикую природу.' },
-            { id: 'trolls_fr', type: 'folder', parent: 'disney', title: 'Тролли', img: 'https://ir.ozone.ru/multimedia/c1000/1023828741.jpg', year: '2016-2023', genre: 'Коллекция', desc: 'Музыкальные приключения троллей.' },
-            { id: 'monsters_fr', type: 'folder', parent: 'disney', title: 'Корпорация монстров', img: 'https://cdn.ananasposter.ru/image/cache/catalog/poster/pos23/10/62977-1000x830.jpg', year: '2001-2013', genre: 'Коллекция', desc: 'Монстры пугают детей ради энергии.' },
-            { id: 'despicable_me_fr', type: 'folder', parent: 'disney', title: 'Гадкий я', img: 'https://www.dvddom.ru/wa-data/public/shop/products/89/04/70489/images/397657/397657.970.jpg', year: '2010-2024', genre: 'Коллекция', desc: 'Злодей Грю становится добрым папой.' },
-            { id: 'inside_out_fr', type: 'folder', parent: 'disney', title: 'Головоломка', img: 'https://lh3.googleusercontent.com/proxy/jY7bVSvEmw4rELdeFZOPBEP7Wh4Rd3aP-3pySNIjzEZ6oTd8Ig_xMsc7uCP9DIBEVdMJS0Z93D7YuOxsEcVS5TILHHfl1SmpAYRDogNixL632KMU', year: '2015-2024', genre: 'Коллекция', desc: 'Эмоции в голове девочки Райли.' },
-            { id: 'moana_fr', type: 'folder', parent: 'disney', title: 'Моана', img: 'https://i.pinimg.com/736x/b9/e8/f2/b9e8f21d14cfef40ed7feb6ff5020c8c.jpg', year: '2016-2024', genre: 'Коллекция', desc: 'Приключения в океане с полубогом Мауи.' },
-            { id: 'shrek_fr', type: 'folder', parent: 'disney', title: 'Шрек', img: 'https://upload.wikimedia.org/wikipedia/ru/3/39/Shrek.jpg', year: '2001-2010', genre: 'Коллекция', desc: 'Огр спасает принцессу.' },
-            { id: 'frozen_fr', type: 'folder', parent: 'disney', title: 'Холодное сердце', img: 'https://static.okko.tv/images/v4/a1d5753c-1fee-4753-b293-437bf944b694', year: '2013-2019', genre: 'Коллекция', desc: 'Анна и Эльза спасают королевство.' },
-            { id: 'puss_fr', type: 'folder', parent: 'disney', title: 'Кот в сапогах', img: 'https://kino.vl.ru/kino/images/big_0016.jpg', year: '2011-2022', genre: 'Коллекция', desc: 'Приключения Кота в сапогах.' },
-            { id: 'zootopia_fr', type: 'folder', parent: 'disney', title: 'Зверополис', img: 'https://thumbs.dfs.ivi.ru/storage0/contents/d/4/2a10de073f4748962f0ac1e409bcfd.jpg', year: '2016', genre: 'Коллекция', desc: 'Зайчиха-полицейский в городе зверей.' },
-            { id: 'sing_fr', type: 'folder', parent: 'disney', title: 'Зверопой', img: 'https://upload.wikimedia.org/wikipedia/ru/8/87/Sing_2_poster.jpg', year: '2016-2021', genre: 'Коллекция', desc: 'Песенный конкурс зверей.' },
-            { id: 'hotel_trans_fr', type: 'folder', parent: 'disney', title: 'Монстры на каникулах', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/4774061/319f7e2f-2c7d-41c0-8826-f7538b7e764f/220x330', year: '2012-2022', genre: 'Коллекция', desc: 'Отель графа Дракулы для монстров и их друзей.' },
-            { id: 'beauty_beast_fr', type: 'folder', parent: 'disney', title: 'Красавица и чудовище', img: 'https://sun1-96.userapi.com/f6CteJIpp-mbK6mo_0AkNaHCN2pCslm0UMlRjA/k4vazH_Nvko.jpg', year: '1991/2017', genre: 'Коллекция', desc: 'История любви Белль и заколдованного принца.' },
-            { id: 'bossbaby_fr', type: 'folder', parent: 'disney', title: 'Босс-молокосос', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/4303601/963dbe30-0a49-4d8c-9f30-4c08c03ed806/600x900', year: '2017-2021', genre: 'Коллекция', desc: 'Младенец-бизнесмен и его брат спасают мир.' },
-            { id: 'cloudy_fr', type: 'folder', parent: 'disney', title: 'Облачно, возможны осадки', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/1629390/3e8bfc32-bcb5-4e7f-947d-874fe8268961/220x330', year: '2009-2013', genre: 'Коллекция', desc: 'Еда падает с неба благодаря изобретению Флинта Локвуда.' },
-            { id: 'badguys_fr', type: 'folder', parent: 'disney', title: 'Плохие парни', img: 'https://upload.wikimedia.org/wikipedia/ru/thumb/1/12/The_Bad_Guys_%282022%29_poster.jpg/960px-The_Bad_Guys_%282022%29_poster.jpg', year: '2022', genre: 'Коллекция', desc: 'Банда зверей пытается стать хорошей, чтобы избежать тюрьмы.' },
-            { id: 'minions_fr', type: 'folder', parent: 'disney', title: 'Миньоны', img: 'https://thumbs.dfs.ivi.ru/storage0/contents/9/4/1cf74914764d9eaffac8bf4a2291e9.jpg', year: '2015-2022', genre: 'Коллекция', desc: 'Приключения желтых помощников Грю.' },
-            { id: 'mulan_fr', type: 'folder', parent: 'disney', title: 'Мулан', img: 'https://static.okko.tv/images/v4/2f527fdd-faa2-4f84-b1a5-9c6a66119c8e?scale=1&quality=80', year: '1998-2020', genre: 'Коллекция', desc: 'Бесстрашная девушка выдает себя за мужчину, чтобы вступить в армию и защитить Китай от нашествия гуннов.' },
-            { id: 'lion_king_fr', type: 'folder', parent: 'disney', title: 'Король Лев', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/1704946/60aa1abc-b754-4817-ad9c-0bcda427a12b/220x330', year: '1994-2024', genre: 'Коллекция', desc: 'Эпическая сага о львенке Симбе, который должен принять свою судьбу и стать королем саванны.' },
-            { id: 'kung_fu_panda_fr', type: 'folder', parent: 'disney', title: 'Кунг-фу Панда', img: 'https://thumbs.dfs.ivi.ru/storage37/contents/1/6/53bdb7d12fe114a3933f44183c835e.jpg', year: '2008-2024', genre: 'Коллекция', desc: 'Неуклюжая панда По становится Воином Дракона и защищает Долину Мира вместе с Неистовой Пятеркой.' },
-            { id: 'toy_story_fr', type: 'folder', parent: 'disney', title: 'История игрушек', img: 'https://upload.wikimedia.org/wikipedia/ru/thumb/a/a6/Toy_Story_1995_Poster.jpg/250px-Toy_Story_1995_Poster.jpg', year: '1995-2019', genre: 'Коллекция', desc: 'Игрушки Энди оживают, когда никого нет рядом. Ковбой Вуди и астронавт Базз переживают невероятные приключения.' },
-            { id: 'httyd_fr', type: 'folder', parent: 'disney', title: 'Как приручить дракона', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/4774061/1a920451-e765-41e9-81aa-78438e82abbc/220x330', year: '2010-2019', genre: 'Коллекция', desc: 'Викинг-подросток Иккинг нарушает традиции своего племени и заводит дружбу с опасным драконом Ночной Фурией.' },
-            { id: 'atlantis_fr', type: 'folder', parent: 'disney', title: 'Атлантида', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/1773646/f98bcf6d-d34c-4d4d-b3cc-f5325bbe3e0d/600x900', year: '2001', genre: 'Коллекция', desc: 'Экспедиция отправляется на поиски легендарной затонувшей империи.' },
-            { id: 'maleficent_fr', type: 'folder', parent: 'disney', title: 'Малефисента', img: 'https://static.okko.tv/images/v4/edd5fe86-363f-42ed-bbb5-d2736fdd740d', year: '2014-2019', genre: 'Коллекция', desc: 'Взгляд на сказку о Спящей Красавице со стороны злодейки Малефисенты.' },
+            // --- WARNER BROS: WONKA ---
+            { id: 'wonka_fr', type: 'folder', parent: 'wb', title: 'Шоколадная фабрика', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/1629390/354d74db-134e-4441-ae62-83c5d3b564a2/220x330', year: '2005-2023', genre: 'Франшиза', desc: 'Волшебный мир шоколада Вилли Вонки.' },
+            { id: 'charlie_m', type: 'movie', parent: 'wonka_fr', title: 'Чарли и шоколадная фабрика', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/1629390/354d74db-134e-4441-ae62-83c5d3b564a2/220x330', url: 'https://vk.com/video_ext.php?oid=-222774085&id=456239985&hd=2', year: '2005', genre: 'Фэнтези', desc: 'Чарли выигрывает золотой билет на фабрику Вилли Вонки.' },
+            { id: 'wonka_m', type: 'movie', parent: 'wonka_fr', title: 'Вонка', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/10893610/2cce4627-1099-477e-a2ec-a0025cb1fea4/600x900', url: 'https://vk.com/video_ext.php?oid=-234086088&id=456239472&hd=2', year: '2023', genre: 'Фэнтези', desc: 'История юного Вилли Вонки и его мечты создать шоколадный магазин.' },
 
-            // --- ВНУТРИ КОЛЛЕКЦИЙ ---
-            { id: 'st_s1', type: 'movie', parent: 'stranger_things_folder', title: 'Сезон 1', img: 'https://www.kinomania.ru/sites/default/files/styles/400/public/film_gallery/8a4394888248b6d62f640c76961cc0fe.jpeg?itok=mFiT-abt', url: 'https://vk.com/video_ext.php?oid=-170333242&id=456239923&hd=2', year: '2016', genre: 'Сезон', desc: 'Начало истории. Исчезновение Уилла и появление Одиннадцатой.' },
-            { id: 'shrek1', type: 'movie', parent: 'shrek_fr', title: 'Шрек 1', img: 'https://upload.wikimedia.org/wikipedia/ru/3/39/Shrek.jpg', url: 'https://vk.com/video_ext.php?oid=-228669978&id=456240070&hd=2', year: '2001', genre: 'Мультфильм', desc: 'Шрек отправляется спасать принцессу Фиону, чтобы вернуть свое болото.' },
-            { id: 'chronicles_1', type: 'movie', parent: 'chronicles_fr', title: 'Хроники Рождества', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/1773646/c5d96751-35fa-4dab-9f72-697aacb04b45/600x900', url: 'https://vk.com/video_ext.php?oid=-217969182&id=456240948&hd=2', year: '2018', genre: 'Комедия', desc: 'Брат и сестра случайно ломают сани Санты и помогают ему спасти Рождество.' },
-            { id: 'chronicles_2', type: 'movie', parent: 'chronicles_fr', title: 'Хроники Рождества 2', img: 'https://24smi.org/public/media/movie/2021/11/18/tkmnk9xurbzj-rozhdestvenskie-khroniki-2.jpg', url: 'https://vk.com/video_ext.php?oid=-45052261&id=456247596&hd=2', year: '2020', genre: 'Комедия', desc: 'Кейт Пирс снова объединяется с Сантой, чтобы остановить таинственного возмутителя спокойствия.' },
-            { id: 'st_s2', type: 'movie', parent: 'stranger_things_folder', title: 'Сезон 2', img: 'https://upload.wikimedia.org/wikipedia/ru/thumb/f/f7/Stranger_Things_season_2.jpg/960px-Stranger_Things_season_2.jpg', url: 'https://vk.com/video_ext.php?oid=-227396331&id=456240934&hd=2', year: '2017', genre: 'Сезон', desc: 'Жители Хоукинса пытаются оправиться от ужасов, но новая угроза нависает над городом.' },
-            { id: 'st_s3', type: 'movie', parent: 'stranger_things_folder', title: 'Сезон 3', img: 'https://upload.wikimedia.org/wikipedia/ru/thumb/5/5e/Stranger_Things_season_3.jpg/540px-Stranger_Things_season_3.jpg', url: 'https://vk.com/video_ext.php?oid=588164737&id=456239818&hd=2', year: '2019', genre: 'Сезон', desc: 'Лето 1985 года. В городе открывается торговый центр, а зло снова пробуждается.' },
-            { id: 'st_s4', type: 'movie', parent: 'stranger_things_folder', title: 'Сезон 4', img: 'https://images-s.kinorium.com/movie/poster/1545339/1080_53847958.jpg', url: 'https://vk.com/video_ext.php?oid=-80021931&id=456242562&hd=2', year: '2022', genre: 'Сезон', desc: 'Герои разбросаны по разным местам, но новая страшная тайна Изнанки объединяет их снова.' },
-            { id: 'st_s5', type: 'movie', parent: 'stranger_things_folder', title: 'Сезон 5', img: 'https://i.playground.ru/e/1rJtR4NOK-WNrVDTnYVdFQ.jpeg', url: 'https://vk.com/video_ext.php?oid=-80021931&id=456247344&hd=2', year: '2025', genre: 'Сезон', desc: 'Финальная битва за Хоукинс и весь мир.' },
-            { id: 'hotel1', type: 'movie', parent: 'hotel_trans_fr', title: 'Монстры на каникулах', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/4774061/319f7e2f-2c7d-41c0-8826-f7538b7e764f/220x330', url: 'https://vk.com/video_ext.php?oid=-10711091&id=456248957&hd=2', year: '2012', genre: 'Мультфильм', desc: 'Человек проникает в отель для монстров.' },
-            { id: 'hotel2', type: 'movie', parent: 'hotel_trans_fr', title: 'Монстры на каникулах 2', img: 'https://thumbs.dfs.ivi.ru/storage0/contents/b/3/2bd51dec91421790f72c0f433421aa.jpg', url: 'https://vk.com/video_ext.php?oid=-10711091&id=456247966&hd=2', year: '2015', genre: 'Мультфильм', desc: 'Внук Дракулы - человек или вампир?' },
-            { id: 'hotel3', type: 'movie', parent: 'hotel_trans_fr', title: 'Монстры на каникулах 3', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/4486362/10fbd545-0498-4ac4-b71a-fb71524aae2a/600x900', url: 'https://vk.com/video_ext.php?oid=-234671087&id=456239139&hd=2', year: '2018', genre: 'Мультфильм', desc: 'Круиз для монстров и влюбленный Дракула.' },
-            { id: 'hotel4', type: 'movie', parent: 'hotel_trans_fr', title: 'Монстры на каникулах 4', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/10703959/2dae14c6-66b7-417e-bafb-490eb6cda2ee/600x900', url: 'https://vk.com/video_ext.php?oid=-136020824&id=456247502&hd=2', year: '2022', genre: 'Мультфильм', desc: 'Монстры становятся людьми, а люди монстрами.' },
-            { id: 'beauty_cartoon', type: 'movie', parent: 'beauty_beast_fr', title: 'Красавица и чудовище (1991)', img: 'https://sun1-96.userapi.com/f6CteJIpp-mbK6mo_0AkNaHCN2pCslm0UMlRjA/k4vazH_Nvko.jpg', url: 'https://vk.com/video_ext.php?oid=-218463181&id=456239645&hd=2', year: '1991', genre: 'Мультфильм', desc: 'Классическая диснеевская история любви.' },
-            { id: 'beauty_live', type: 'movie', parent: 'beauty_beast_fr', title: 'Красавица и чудовище (2017)', img: 'https://static.okko.tv/images/v4/f9cd5852-dbb7-4605-993c-6fdb6173a92a', url: 'https://vk.com/video_ext.php?oid=-176294899&id=456242823&hd=2', year: '2017', genre: 'Фильм', desc: 'Киноверсия знаменитой сказки.' },
-            { id: 'boss1', type: 'movie', parent: 'bossbaby_fr', title: 'Босс-молокосос', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/4303601/963dbe30-0a49-4d8c-9f30-4c08c03ed806/600x900', url: 'https://vk.com/video_ext.php?oid=-229065002&id=456239466&hd=2', year: '2017', genre: 'Мультфильм', desc: 'Необычный младенец-бизнесмен.' },
-            { id: 'boss2', type: 'movie', parent: 'bossbaby_fr', title: 'Босс-молокосос 2', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/4303601/94f49f2c-a055-4844-a563-2860f988007a/600x900', url: 'https://vk.com/video_ext.php?oid=-227396331&id=456240662&hd=2', year: '2021', genre: 'Мультфильм', desc: 'Братья снова становятся детьми для миссии.' },
-            { id: 'cloudy1', type: 'movie', parent: 'cloudy_fr', title: 'Облачно, возможны осадки...', img: 'https://images.justwatch.com/poster/243878080/s718/cloudy-with-a-chance-of-meatballs.jpg', url: 'https://vk.com/video_ext.php?oid=-197910934&id=456239648&hd=2', year: '2009', genre: 'Мультфильм', desc: 'Еда падает с неба.' },
-            { id: 'cloudy2', type: 'movie', parent: 'cloudy_fr', title: 'Облачно... 2: Месть ГМО', img: 'https://ir.ozone.ru/s3/multimedia-f/6043395963.jpg', url: 'https://vk.com/video_ext.php?oid=-233162373&id=456239156&hd=2', year: '2013', genre: 'Мультфильм', desc: 'Еда ожила и создала экосистему.' },
-            { id: 'bg1', type: 'movie', parent: 'badguys_fr', title: 'Плохие парни', img: 'https://upload.wikimedia.org/wikipedia/ru/thumb/1/12/The_Bad_Guys_%282022%29_poster.jpg/960px-The_Bad_Guys_%282022%29_poster.jpg', url: 'https://vk.com/video_ext.php?oid=-233534237&id=456239260&hd=2', year: '2022', genre: 'Мультфильм', desc: 'Злодеи пытаются стать хорошими.' },
-            { id: 'bg2', type: 'movie', parent: 'badguys_fr', title: 'Плохие парни 2', img: 'https://redheadsound.studio/uploads/posts/2025-09/f949c2ffc1_n183749618344ng70u45c.webp', url: 'https://vk.com/video_ext.php?oid=-229802753&id=456239070&hd=2', year: '2023', genre: 'Мультфильм', desc: 'Праздничный спецвыпуск.' },
-            { id: 'minions1', type: 'movie', parent: 'minions_fr', title: 'Миньоны', img: 'https://thumbs.dfs.ivi.ru/storage0/contents/9/4/1cf74914764d9eaffac8bf4a2291e9.jpg', url: 'https://vk.com/video_ext.php?oid=-113071474&id=456241078&t=27&hd=2', year: '2015', genre: 'Мультфильм', desc: 'История миньонов до Грю.' },
-            { id: 'minions2', type: 'movie', parent: 'minions_fr', title: 'Миньоны: Грювитация', img: 'https://ir.ozone.ru/s3/multimedia-s/c1000/6418258216.jpg', url: 'https://vk.com/video_ext.php?oid=-225225538&id=456240434&t=29&hd=2', year: '2022', genre: 'Мультфильм', desc: 'Юный Грю и миньоны.' },
-            { id: 'mulan1', type: 'movie', parent: 'mulan_fr', title: 'Мулан (1998)', img: 'https://static.okko.tv/images/v4/2f527fdd-faa2-4f84-b1a5-9c6a66119c8e?scale=1&quality=80', url: 'https://vk.com/video_ext.php?oid=-218463181&id=456239702&hd=2', year: '1998', genre: 'Мультфильм', desc: 'Девушка идет на войну вместо отца.' },
-            { id: 'mulan2', type: 'movie', parent: 'mulan_fr', title: 'Мулан 2', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/1629390/ae4cfd89-7202-46d2-bcc8-214d28065853/600x900', url: 'https://vk.com/video_ext.php?oid=-222609266&id=456241134&hd=2', year: '2004', genre: 'Мультфильм', desc: 'Подготовка к свадьбе и новая миссия.' },
-            { id: 'mulan_live', type: 'movie', parent: 'mulan_fr', title: 'Мулан (Фильм)', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/1599028/d3803b48-ea27-44d6-aaec-3403f80c4516/600x900', url: 'https://vk.com/video_ext.php?oid=-229359218&id=456240274&hd=2', year: '2020', genre: 'Фильм', desc: 'Киноадаптация легенды.' },
-            { id: 'lionking1', type: 'movie', parent: 'lion_king_fr', title: 'Король Лев (1994)', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/1704946/60aa1abc-b754-4817-ad9c-0bcda427a12b/220x330', url: 'https://vk.com/video_ext.php?oid=-213373960&id=456239154&hd=2', year: '1994', genre: 'Мультфильм', desc: 'Король саванны.' },
-            { id: 'lionking2', type: 'movie', parent: 'lion_king_fr', title: 'Король Лев 2', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/1629390/429397cd-5bdb-4814-afda-9e1d9b39451a/600x900', url: 'https://vk.com/video_ext.php?oid=-186629479&id=456241695&hd=2', year: '1998', genre: 'Мультфильм', desc: 'История дочери Симбы.' },
-            { id: 'lionking3', type: 'movie', parent: 'lion_king_fr', title: 'Король Лев 3', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/1900788/b97e7837-4708-408f-9762-071faf6c1886/600x900', url: 'https://vk.com/video_ext.php?oid=-228899973&id=456239029&hd=2', year: '2004', genre: 'Мультфильм', desc: 'История Тимона и Пумбы.' },
-            { id: 'lionking2019', type: 'movie', parent: 'lion_king_fr', title: 'Король Лев (2019)', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/1599028/543dce27-3a14-4d8b-9d85-3a1b80ec7368/600x900', url: 'https://vk.com/video_ext.php?oid=-218217231&id=456239541&hd=2', year: '2019', genre: 'Фильм', desc: 'Реалистичный ремейк.' },
-            { id: 'lionkingmufasa', type: 'movie', parent: 'lion_king_fr', title: 'Муфаса: Король Лев', img: 'https://images.kinomax.ru/500/films/8/8114/p_76c3ae9.ebp', url: 'https://vk.com/video_ext.php?oid=40624004&id=456239808&hd=2', year: '2024', genre: 'Фильм', desc: 'История отца Симбы.' },
-            { id: 'kfp1', type: 'movie', parent: 'kung_fu_panda_fr', title: 'Кунг-фу Панда', img: 'https://thumbs.dfs.ivi.ru/storage37/contents/1/6/53bdb7d12fe114a3933f44183c835e.jpg', url: 'https://vk.com/video_ext.php?oid=-230447797&id=456239134&hd=2', year: '2008', genre: 'Мультфильм', desc: 'Панда становится мастером кунг-фу.' },
-            { id: 'kfp2', type: 'movie', parent: 'kung_fu_panda_fr', title: 'Кунг-фу Панда 2', img: 'https://upload.wikimedia.org/wikipedia/ru/8/88/Kung-Fu-Panda-2.jpg', url: 'https://vk.com/video_ext.php?oid=-230447797&id=456239135&hd=2', year: '2011', genre: 'Мультфильм', desc: 'Новая угроза Китаю.' },
-            { id: 'kfp3', type: 'movie', parent: 'kung_fu_panda_fr', title: 'Кунг-фу Панда 3', img: 'https://play-lh.googleusercontent.com/xotwa4yu8uYl7t86UXj33jlgTmfNXc-uIn8dqi2q60O8lunS7U-kjxTXYPRcBS8FyLw', url: 'https://vk.com/video_ext.php?oid=-231729433&id=456241057&hd=2', year: '2016', genre: 'Мультфильм', desc: 'Семья панд.' },
-            { id: 'kfp4', type: 'movie', parent: 'kung_fu_panda_fr', title: 'Кунг-фу Панда 4', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/9784475/6f8c20ab-d744-4ac3-9d5a-ac15942eb4eb/600x900', url: 'https://vk.com/video_ext.php?oid=-226802088&id=456249295&hd=2', year: '2024', genre: 'Мультфильм', desc: 'Новая глава.' },
-            { id: 'toystory1', type: 'movie', parent: 'toy_story_fr', title: 'История игрушек', img: 'https://cdn.ananasposter.ru/image/cache/catalog/poster/mult/95/2378-1000x830.jpg', url: 'https://vk.com/video_ext.php?oid=-226802088&id=456261230&hd=2', year: '1995', genre: 'Мультфильм', desc: 'Игрушки оживают.' },
-            { id: 'toystory2', type: 'movie', parent: 'toy_story_fr', title: 'История игрушек 2', img: 'https://upload.wikimedia.org/wikipedia/ru/c/c0/Toy_Story_2.jpg', url: 'https://vk.com/video_ext.php?oid=-231332300&id=456239018&hd=2', year: '1999', genre: 'Мультфильм', desc: 'Спасение Вуди.' },
-            { id: 'toystory3', type: 'movie', parent: 'toy_story_fr', title: 'История игрушек 3', img: 'https://upload.wikimedia.org/wikipedia/ru/c/cc/Toystory3_46.jpg', url: 'https://vk.com/video_ext.php?oid=-220118968&id=456244302&hd=2', year: '2010', genre: 'Мультфильм', desc: 'Побег из детского сада.' },
-            { id: 'toystory4', type: 'movie', parent: 'toy_story_fr', title: 'История игрушек 4', img: 'https://kassa.rambler.ru/s/StaticContent/P/Aimg/2208/02/220802103147308.jpg', url: 'https://vk.com/video_ext.php?oid=-226802088&id=456261229&hd=2', year: '2019', genre: 'Мультфильм', desc: 'Новая игрушка Вилкинс.' },
-            { id: 'httyd1', type: 'movie', parent: 'httyd_fr', title: 'Как приручить дракона', img: 'https://static.wikia.nocookie.net/httyd/images/9/97/HTTYD_1_cover.png/revision/latest?cb=20220714170539&path-prefix=ru', url: 'https://vk.com/video_ext.php?oid=-231061010&id=456239018&hd=2', year: '2010', genre: 'Мультфильм', desc: 'Дружба викинга и дракона.' },
-            { id: 'httyd2', type: 'movie', parent: 'httyd_fr', title: 'Как приручить дракона 2', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/1599028/929283bf-9ae9-422f-9ac2-edf5d3e16aea/600x900', url: 'https://vk.com/video_ext.php?oid=-34229261&id=456247502&hd=2', year: '2014', genre: 'Мультфильм', desc: 'Открытие новых земель.' },
-            { id: 'httyd3', type: 'movie', parent: 'httyd_fr', title: 'Как приручить дракона 3', img: 'https://ir.ozone.ru/multimedia/c1000/1037022856.jpg', url: 'https://vk.com/video_ext.php?oid=-222609266&id=456240386&hd=2', year: '2019', genre: 'Мультфильм', desc: 'Скрытый мир драконов.' },
-            { id: 'httyd_live', type: 'movie', parent: 'httyd_fr', title: 'Как приручить дракона (Фильм)', img: 'https://upload.wikimedia.org/wikipedia/ru/thumb/0/07/%D0%9A%D0%B0%D0%BA_%D0%BF%D1%80%D0%B8%D1%80%D1%83%D1%87%D0%B8%D1%82%D1%8C_%D0%B4%D1%80%D0%B0%D0%BA%D0%BE%D0%BD%D0%B0_%28%D1%84%D0%B8%D0%BB%D1%8C%D0%BC%29.webp/400px-%D0%9A%D0%B0%D0%BA_%D0%BF%D1%80%D0%B8%D1%80%D1%83%D1%87%D0%B8%D1%82%D1%8C_%D0%B4%D1%80%D0%B0%D0%BA%D0%BE%D0%BD%D0%B0_%28%D1%84%D0%B8%D0%BB%D1%8C%D0%BC%29.webp.png', url: 'https://vk.com/video_ext.php?oid=-145660488&id=456239820&hd=2', year: '2025', genre: 'Фильм', desc: 'Киноверсия.' },
-            { id: 'atlantis1', type: 'movie', parent: 'atlantis_fr', title: 'Атлантида: Затерянный мир', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/1773646/f98bcf6d-d34c-4d4d-b3cc-f5325bbe3e0d/600x900', url: 'https://vk.com/video_ext.php?oid=-214045512&id=456241011&hd=2', year: '2001', genre: 'Мультфильм', desc: 'Поиски легендарной города.' },
-            { id: 'atlantis2', type: 'movie', parent: 'atlantis_fr', title: 'Атлантида 2', img: 'https://upload.wikimedia.org/wikipedia/ru/e/e5/%D0%90%D1%82%D0%BB%D0%B0%D0%BD%D1%82%D0%B8%D0%B4%D0%B0_%D0%92%D0%BE%D0%B7%D0%B2%D1%80%D0%B0%D1%89%D0%B5%D0%BD%D0%B8%D0%B5_%D0%9C%D0%B0%D0%B9%D0%BB%D0%BE.jpg', url: 'https://vk.com/video_ext.php?oid=-220052305&id=456239422&hd=2', year: '2003', genre: 'Мультфильм', desc: 'Новые приключения Майло.' },
-            { id: 'maleficent1', type: 'movie', parent: 'maleficent_fr', title: 'Малефисента', img: 'https://www.kinobusiness.com/upload/resize_cache/iblock/a9f/360_560_1/a9f365b110af7c493823a6d573390cce.jpg', url: 'https://vk.com/video_ext.php?oid=-166506328&id=456241464&hd=2', year: '2014', genre: 'Фэнтези', desc: 'История злодейки.' },
-            { id: 'maleficent2', type: 'movie', parent: 'maleficent_fr', title: 'Малефисента 2', img: 'https://www.kinonews.ru/insimgs/2019/poster/poster89457_1.jpg', url: 'https://vk.com/video_ext.php?oid=-166506328&id=456241465&hd=2', year: '2019', genre: 'Фэнтези', desc: 'Владычица тьмы.' },
-            { id: 'pets1', type: 'movie', parent: 'pets_fr', title: 'Тайная жизнь домашних животных', img: 'https://upload.wikimedia.org/wikipedia/ru/5/58/%D0%A2%D0%B0%D0%B9%D0%BD%D0%B0%D1%8F_%D0%B6%D0%B8%D0%B7%D0%BD%D1%8C_%D0%B4%D0%BE%D0%BC%D0%B0%D1%88%D0%BD%D0%B8%D1%85_%D0%B6%D0%B8%D0%B2%D0%BE%D1%82%D0%BD%D1%8B%D1%85_%28%D0%BF%D0%BE%D1%81%D1%82%D0%B5%D1%80%29.jpg', url: 'https://vk.com/video_ext.php?oid=-217081635&id=456239495&hd=2', year: '2016', genre: 'Мультфильм', desc: 'Тайны питомцев.' },
-            { id: 'pets2', type: 'movie', parent: 'pets_fr', title: 'Тайная жизнь домашних животных 2', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/1629390/e0753994-6ce8-48eb-8d2f-eeb33a86d43b/600x900', url: 'https://vk.com/video_ext.php?oid=-223476607&id=456239434&hd=2', year: '2019', genre: 'Мультфильм', desc: 'Продолжение.' },
-            { id: 'nemo', type: 'movie', parent: 'nemo_fr', title: 'В поисках Немо', img: 'https://ir.ozone.ru/s3/multimedia-3/c1000/6389281719.jpg', url: 'https://vk.com/video_ext.php?oid=-127233416&id=456240189&hd=2', year: '2003', genre: 'Мультфильм', desc: 'Поиски сына.' },
-            { id: 'dory', type: 'movie', parent: 'nemo_fr', title: 'В поисках Дори', img: 'https://upload.wikimedia.org/wikipedia/ru/8/8a/%D0%92_%D0%BF%D0%BE%D0%B8%D1%81%D0%BA%D0%B0%D1%85_%D0%94%D0%BE%D1%80%D0%B8_%28%D0%BF%D0%BE%D1%81%D1%82%D0%B5%D1%80%29.jpg', url: 'https://vk.com/video_ext.php?oid=-118840854&id=456252818&hd=2', year: '2016', genre: 'Мультфильм', desc: 'Дори ищет семью.' },
-            { id: 'madagascar1', type: 'movie', parent: 'madagascar_fr', title: 'Мадагаскар', img: 'https://ru-images.kinorium.com/movie/1080/275584.jpg?1676328611', url: 'https://vk.com/video_ext.php?oid=-228899973&id=456239022&hd=2', year: '2005', genre: 'Мультфильм', desc: 'Побег из зоопарка.' },
-            { id: 'madagascar2', type: 'movie', parent: 'madagascar_fr', title: 'Мадагаскар 2', img: 'https://upload.wikimedia.org/wikipedia/ru/b/bf/Madagascar_2.jpg', url: 'https://vk.com/video_ext.php?oid=-230447797&id=456239173&hd=2', year: '2008', genre: 'Мультфильм', desc: 'Приключения в Африке.' },
-            { id: 'madagascar3', type: 'movie', parent: 'madagascar_fr', title: 'Мадагаскар 3', img: 'https://basket-02.wbbasket.ru/vol287/part28759/28759754/images/big/1.webp', url: 'https://vk.com/video_ext.php?oid=-230229363&id=456240695&hd=2', year: '2012', genre: 'Мультфильм', desc: 'Цирковое турне.' },
-            { id: 'trolls1', type: 'movie', parent: 'trolls_fr', title: 'Тролли', img: 'https://play-lh.googleusercontent.com/NIJpQJ-TvOnRMuK0iIC2TyuKp2KuLJeJXxHkEAbinBquXSCuOPpuBPtUD8wElt8gUfYd0Lp9nSfFXx-Sr5I', url: 'https://vk.com/video_ext.php?oid=-80021931&id=456243745&hd=2', year: '2016', genre: 'Мультфильм', desc: 'Музыкальные тролли.' },
-            { id: 'trolls2', type: 'movie', parent: 'trolls_fr', title: 'Тролли 2', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/1599028/6ff6a967-a4b4-43e9-bab1-da3029c618e4/600x900', url: 'https://vk.com/video_ext.php?oid=-230599619&id=456239134&hd=2', year: '2020', genre: 'Мультфильм', desc: 'Мировой тур.' },
-            { id: 'trolls3', type: 'movie', parent: 'trolls_fr', title: 'Тролли 3', img: 'https://upload.wikimedia.org/wikipedia/ru/7/7c/%D0%A2%D1%80%D0%BE%D0%BB%D0%BB%D0%B8_3.jpg', url: 'https://vk.com/video_ext.php?oid=-229356529&id=456239073&hd=2', year: '2023', genre: 'Мультфильм', desc: 'Группа в сборе.' },
-            { id: 'monsters_inc', type: 'movie', parent: 'monsters_fr', title: 'Корпорация монстров', img: 'https://cdn.ananasposter.ru/image/cache/catalog/poster/pos23/10/62977-1000x830.jpg', url: 'https://vk.com/video_ext.php?oid=-226802088&id=456244772&hd=2', year: '2001', genre: 'Мультфильм', desc: 'Мы пугаем, потому что нам не все равно.' },
-            { id: 'despicable_me_fr', type: 'folder', parent: 'disney', title: 'Гадкий я', img: 'https://www.dvddom.ru/wa-data/public/shop/products/89/04/70489/images/397657/397657.970.jpg', year: '2010-2024', genre: 'Коллекция', desc: 'Злодей Грю становится добрым папой.' },
-            { id: 'inside_out_fr', type: 'folder', parent: 'disney', title: 'Головоломка', img: 'https://lh3.googleusercontent.com/proxy/jY7bVSvEmw4rELdeFZOPBEP7Wh4Rd3aP-3pySNIjzEZ6oTd8Ig_xMsc7uCP9DIBEVdMJS0Z93D7YuOxsEcVS5TILHHfl1SmpAYRDogNixL632KMU', year: '2015-2024', genre: 'Коллекция', desc: 'Эмоции в голове девочки Райли.' },
-            { id: 'moana_fr', type: 'folder', parent: 'disney', title: 'Моана', img: 'https://i.pinimg.com/736x/b9/e8/f2/b9e8f21d14cfef40ed7feb6ff5020c8c.jpg', year: '2016-2024', genre: 'Коллекция', desc: 'Приключения в океане с полубогом Мауи.' },
-            { id: 'shrek_fr', type: 'folder', parent: 'disney', title: 'Шрек', img: 'https://upload.wikimedia.org/wikipedia/ru/3/39/Shrek.jpg', year: '2001-2010', genre: 'Коллекция', desc: 'Огр спасает принцессу.' },
-            { id: 'frozen_fr', type: 'folder', parent: 'disney', title: 'Холодное сердце', img: 'https://static.okko.tv/images/v4/a1d5753c-1fee-4753-b293-437bf944b694', year: '2013-2019', genre: 'Коллекция', desc: 'Анна и Эльза спасают королевство.' },
-            { id: 'puss_fr', type: 'folder', parent: 'disney', title: 'Кот в сапогах', img: 'https://kino.vl.ru/kino/images/big_0016.jpg', year: '2011-2022', genre: 'Коллекция', desc: 'Приключения Кота в сапогах.' },
-            { id: 'zootopia_fr', type: 'folder', parent: 'disney', title: 'Зверополис', img: 'https://thumbs.dfs.ivi.ru/storage0/contents/d/4/2a10de073f4748962f0ac1e409bcfd.jpg', year: '2016', genre: 'Коллекция', desc: 'Зайчиха-полицейский в городе зверей.' },
-            { id: 'sing_fr', type: 'folder', parent: 'disney', title: 'Зверопой', img: 'https://upload.wikimedia.org/wikipedia/ru/8/87/Sing_2_poster.jpg', year: '2016-2021', genre: 'Коллекция', desc: 'Песенный конкурс зверей.' },
+            // --- WARNER BROS: LORD OF THE RINGS ---
+            { id: 'lotr_fr', type: 'folder', parent: 'wb', title: 'Властелин Колец', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/6201401/a2d5bcae-a1a9-442f-8195-f5373a5ba77f/220x330', year: '2001-2024', genre: 'Франшиза', desc: 'Эпическая сага о Средиземье.' },
+            
+            { id: 'lotr1', type: 'movie', parent: 'lotr_fr', title: 'Властелин колец: Братство Кольца', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/6201401/a2d5bcae-a1a9-442f-8195-f5373a5ba77f/220x330', url: 'https://vk.com/video_ext.php?oid=-194718512&id=456240013&hd=2', year: '2001', genre: 'Фэнтези', desc: 'Хоббит Фродо отправляется в поход, чтобы уничтожить Кольцо Всевластия.' },
+            { id: 'lotr2', type: 'movie', parent: 'lotr_fr', title: 'Властелин колец: Две крепости', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/6201401/772093e4-7f68-49aa-a805-d654693aee26/150x225', url: 'https://vk.com/video_ext.php?oid=-222609266&id=456239805&hd=2', year: '2002', genre: 'Фэнтези', desc: 'Братство распалось, но надежда на победу над Сауроном еще жива.' },
+            { id: 'lotr3', type: 'movie', parent: 'lotr_fr', title: 'Властелин колец: Возвращение короля', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/4303601/e410c71f-baa1-4fe5-bb29-aedb4662f49b/220x330', url: 'https://vk.com/video_ext.php?oid=-222609266&id=456239806&hd=2', year: '2003', genre: 'Фэнтези', desc: 'Финальная битва за Средиземье.' },
+
+            { id: 'hobbit1', type: 'movie', parent: 'lotr_fr', title: 'Хоббит: Нежданное путешествие', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/4303601/0e569ebd-0639-416b-92c5-2afffbd5d089/220x330', url: 'https://vk.com/video_ext.php?oid=55918787&id=456239693&hd=2', year: '2012', genre: 'Фэнтези', desc: 'Бильбо Бэггинс отправляется в путешествие, чтобы вернуть королевство гномов.' },
+            { id: 'hobbit2', type: 'movie', parent: 'lotr_fr', title: 'Хоббит: Пустошь Смауга', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/6201401/dd195023-81e0-42bc-9b33-e86ac8abf30e/220x330', url: 'https://vk.com/video_ext.php?oid=55918787&id=456239695&hd=2', year: '2013', genre: 'Фэнтези', desc: 'Гномы достигают Одинокой горы, где спит дракон Смауг.' },
+            { id: 'hobbit3', type: 'movie', parent: 'lotr_fr', title: 'Хоббит: Битва пяти воинств', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/1600647/ee1276c4-6e67-45cd-94db-8bd47bb21da4/150x225', url: 'https://vk.com/video_ext.php?oid=55918787&id=456239696&hd=2', year: '2014', genre: 'Фэнтези', desc: 'Эпическая битва за Эребор.' },
+
+            // --- RINGS OF POWER (Series structure) ---
+            { id: 'rings_power_series', type: 'folder', parent: 'lotr_fr', title: 'Властелин колец: Кольца власти', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/9784475/2125b827-3a35-441a-94fe-c89db9ffd1a2/600x900', year: '2022-2024', genre: 'Сериал, Фэнтези', desc: 'События Второй эпохи Средиземья: создание Колец Власти и восхождение Саурона.' },
+
+            // S1
+            { id: 'rop_s1', type: 'folder', parent: 'rings_power_series', title: 'Сезон 1', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/9784475/2125b827-3a35-441a-94fe-c89db9ffd1a2/600x900', year: '2022', genre: 'Сериал', desc: 'Первый сезон.' },
+            { id: 'rop_s1_e1', type: 'movie', parent: 'rop_s1', title: 'Серия 1', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/9784475/2125b827-3a35-441a-94fe-c89db9ffd1a2/600x900', url: 'https://vk.com/video_ext.php?oid=-229598594&id=456240573&hd=2', year: 'S01', genre: 'E01', desc: 'Тень прошлого.' },
+            { id: 'rop_s1_e2', type: 'movie', parent: 'rop_s1', title: 'Серия 2', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/9784475/2125b827-3a35-441a-94fe-c89db9ffd1a2/600x900', url: 'https://vk.com/video_ext.php?oid=-229598594&id=456240574&hd=2', year: 'S01', genre: 'E02', desc: 'По течению.' },
+            { id: 'rop_s1_e3', type: 'movie', parent: 'rop_s1', title: 'Серия 3', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/9784475/2125b827-3a35-441a-94fe-c89db9ffd1a2/600x900', url: 'https://vk.com/video_ext.php?oid=-229598594&id=456240575&hd=2', year: 'S01', genre: 'E03', desc: 'Адар.' },
+            { id: 'rop_s1_e4', type: 'movie', parent: 'rop_s1', title: 'Серия 4', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/9784475/2125b827-3a35-441a-94fe-c89db9ffd1a2/600x900', url: 'https://vk.com/video_ext.php?oid=-229598594&id=456240576&hd=2', year: 'S01', genre: 'E04', desc: 'Великая волна.' },
+            { id: 'rop_s1_e5', type: 'movie', parent: 'rop_s1', title: 'Серия 5', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/9784475/2125b827-3a35-441a-94fe-c89db9ffd1a2/600x900', url: 'https://vk.com/video_ext.php?oid=-229598594&id=456239907&hd=2', year: 'S01', genre: 'E05', desc: 'Расставания.' },
+            { id: 'rop_s1_e6', type: 'movie', parent: 'rop_s1', title: 'Серия 6', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/9784475/2125b827-3a35-441a-94fe-c89db9ffd1a2/600x900', url: 'https://vk.com/video_ext.php?oid=-229598594&id=456240255&hd=2', year: 'S01', genre: 'E06', desc: 'Удун.' },
+            { id: 'rop_s1_e7', type: 'movie', parent: 'rop_s1', title: 'Серия 7', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/9784475/2125b827-3a35-441a-94fe-c89db9ffd1a2/600x900', url: 'https://vk.com/video_ext.php?oid=-229598594&id=456240577&hd=2', year: 'S01', genre: 'E07', desc: 'Глаз.' },
+            { id: 'rop_s1_e8', type: 'movie', parent: 'rop_s1', title: 'Серия 8', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/9784475/2125b827-3a35-441a-94fe-c89db9ffd1a2/600x900', url: 'https://vk.com/video_ext.php?oid=-229598594&id=456240578&hd=2', year: 'S01', genre: 'E08', desc: 'Сплавленные.' },
+
+            // S2
+            { id: 'rop_s2', type: 'folder', parent: 'rings_power_series', title: 'Сезон 2', img: 'https://cdn.kanobu.ru/serials/serials/50e790ed-4476-4d4f-8d48-58250c0e68c2.webp', year: '2024', genre: 'Сериал', desc: 'Второй сезон.' },
+            { id: 'rop_s2_e1', type: 'movie', parent: 'rop_s2', title: 'Серия 1', img: 'https://cdn.kanobu.ru/serials/serials/50e790ed-4476-4d4f-8d48-58250c0e68c2.webp', url: 'https://vk.com/video_ext.php?oid=-229598594&id=456240752&hd=2', year: 'S02', genre: 'E01', desc: 'Эльфийские короли.' },
+            { id: 'rop_s2_e2', type: 'movie', parent: 'rop_s2', title: 'Серия 2', img: 'https://cdn.kanobu.ru/serials/serials/50e790ed-4476-4d4f-8d48-58250c0e68c2.webp', url: 'https://vk.com/video_ext.php?oid=-229598594&id=456240753&hd=2', year: 'S02', genre: 'E02', desc: 'Где звезды странны.' },
+            { id: 'rop_s2_e3', type: 'movie', parent: 'rop_s2', title: 'Серия 3', img: 'https://cdn.kanobu.ru/serials/serials/50e790ed-4476-4d4f-8d48-58250c0e68c2.webp', url: 'https://vk.com/video_ext.php?oid=-229598594&id=456240754&hd=2', year: 'S02', genre: 'E03', desc: 'Орел и Скипетр.' },
+            { id: 'rop_s2_e4', type: 'movie', parent: 'rop_s2', title: 'Серия 4', img: 'https://cdn.kanobu.ru/serials/serials/50e790ed-4476-4d4f-8d48-58250c0e68c2.webp', url: 'https://vk.com/video_ext.php?oid=-229598594&id=456240755&hd=2', year: 'S02', genre: 'E04', desc: 'Эльдаст.' },
+            { id: 'rop_s2_e5', type: 'movie', parent: 'rop_s2', title: 'Серия 5', img: 'https://cdn.kanobu.ru/serials/serials/50e790ed-4476-4d4f-8d48-58250c0e68c2.webp', url: 'https://vk.com/video_ext.php?oid=-229598594&id=456240756&hd=2', year: 'S02', genre: 'E05', desc: 'Чертоги.' },
+            { id: 'rop_s2_e6', type: 'movie', parent: 'rop_s2', title: 'Серия 6', img: 'https://cdn.kanobu.ru/serials/serials/50e790ed-4476-4d4f-8d48-58250c0e68c2.webp', url: 'https://vk.com/video_ext.php?oid=-229598594&id=456240757&hd=2', year: 'S02', genre: 'E06', desc: 'Где все?' },
+            { id: 'rop_s2_e7', type: 'movie', parent: 'rop_s2', title: 'Серия 7', img: 'https://cdn.kanobu.ru/serials/serials/50e790ed-4476-4d4f-8d48-58250c0e68c2.webp', url: 'https://vk.com/video_ext.php?oid=-229598594&id=456240758&hd=2', year: 'S02', genre: 'E07', desc: 'Обреченные умереть.' },
+            { id: 'rop_s2_e8', type: 'movie', parent: 'rop_s2', title: 'Серия 8', img: 'https://cdn.kanobu.ru/serials/serials/50e790ed-4476-4d4f-8d48-58250c0e68c2.webp', url: 'https://vk.com/video_ext.php?oid=-229598594&id=456240759&hd=2', year: 'S02', genre: 'E08', desc: 'Тень и пламя.' },
+
+            // --- WARNER BROS: HARRY POTTER ---
+            { id: 'hp_fr', type: 'folder', parent: 'wb', title: 'Гарри Поттер', img: 'https://www.moscowbooks.ru/image/book/337/orig/i337704.jpg?cu=20180101000000', year: '2001-2011', genre: 'Франшиза', desc: 'История Мальчика, который выжил, и его друзей в школе чародейства и волшебства Хогвартс.' },
+            { id: 'hp1', type: 'movie', parent: 'hp_fr', title: 'Гарри Поттер и Философский камень', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/1898899/27ed5c19-a045-49dd-8624-5f629c5d96e0/220x330', url: 'https://vk.com/video_ext.php?oid=-222403619&id=456239172&hd=2', year: '2001', genre: 'Фэнтези', desc: 'Одиннадцатилетний сирота Гарри узнает, что он волшебник, и отправляется учиться магии.' },
+            { id: 'hp2', type: 'movie', parent: 'hp_fr', title: 'Гарри Поттер и Тайная комната', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/4774061/1ef65bfb-b16b-42aa-a54a-758395253290/220x330', url: 'https://vk.com/video_ext.php?oid=-145832074&id=456239509&hd=2', year: '2002', genre: 'Фэнтези', desc: 'Гарри возвращается в Хогвартс, где открыта Тайная комната и чудовище нападает на учеников.' },
+            { id: 'hp3', type: 'movie', parent: 'hp_fr', title: 'Гарри Поттер и узник Азкабана', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/4303601/3eabac99-fb98-4b12-ba9f-6172782d54c6/220x330', url: 'https://vk.com/video_ext.php?oid=-194145340&id=456240191&hd=2', year: '2004', genre: 'Фэнтези', desc: 'Опасный преступник Сириус Блэк сбегает из тюрьмы, чтобы найти Гарри.' },
+            { id: 'hp4', type: 'movie', parent: 'hp_fr', title: 'Гарри Поттер и Кубок огня', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/4303601/672269af-efcb-41c3-85b4-e9ce87f1ea02/220x330', url: 'https://vk.com/video_ext.php?oid=-212303055&id=456239185&hd=2', year: '2005', genre: 'Фэнтези', desc: 'Гарри таинственным образом становится участником Турнира Трех Волшебников.' },
+            { id: 'hp5', type: 'movie', parent: 'hp_fr', title: 'Гарри Поттер и Орден Феникса', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/4303601/1c8e7019-20c6-4bfb-ad17-6b7746ca5147/220x330', url: 'https://vk.com/video_ext.php?oid=-222609266&id=456239453&hd=2&t=5089', year: '2007', genre: 'Фэнтези', desc: 'Гарри создает тайный отряд Дамблдора для борьбы с Волан-де-Мортом.' },
+            { id: 'hp6', type: 'movie', parent: 'hp_fr', title: 'Гарри Поттер и Принц-полукровка', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/4774061/3b4b90e6-0b62-410c-a583-6977df318fbe/220x330', url: 'https://vk.com/video_ext.php?oid=-194145340&id=456240194&hd=2', year: '2009', genre: 'Фэнтези', desc: 'Дамблдор и Гарри пытаются раскрыть секрет бессмертия Темного Лорда.' },
+            { id: 'hp7', type: 'movie', parent: 'hp_fr', title: 'Гарри Поттер и Дары Смерти: Часть I', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/4486454/a3be2f33-412f-4284-a157-84a5ad5efae9/220x330', url: 'https://vk.com/video_ext.php?oid=-233305176&id=456241180&hd=2', year: '2010', genre: 'Фэнтези', desc: 'Гарри, Рон и Гермиона отправляются на поиски крестражей.' },
+            { id: 'hp8', type: 'movie', parent: 'hp_fr', title: 'Гарри Поттер и Дары Смерти: Часть II', img: 'https://avatars.mds.yandex.net/get-kinopoisk-image/10703959/19be7746-e2b1-42b5-9de0-c416d34da5f5/220x330', url: 'https://vk.com/video_ext.php?oid=479200497&id=456244395&hd=2', year: '2011', genre: 'Фэнтези', desc: 'Финальная битва за Хогвартс.' },
         ];
 
         let appState = 'splash'; 
         let activeMenuIndex = 1; 
         let activeGridIndex = 0;
+        let activePlayerIndex = -1; // Индекс текущего видео в папке
         let currentItems = [];
         let historyStack = []; 
         let btnTimer;
@@ -378,6 +449,7 @@
         const menuItems = document.querySelectorAll('.menu-item');
         const gridEl = document.getElementById('grid');
         const closeBtn = document.getElementById('close-btn');
+        const nextBtn = document.getElementById('next-btn');
         const infoPanel = document.getElementById('info-panel');
         const infoTitle = document.getElementById('info-title');
         const infoMeta = document.getElementById('info-meta');
@@ -413,9 +485,9 @@
                 gridEl.style.gridTemplateColumns = 'repeat(2, 1fr)';
                 gridEl.style.gap = '15px';
             } else {
-                COLS = 6;
-                gridEl.style.gridTemplateColumns = 'repeat(6, 1fr)';
-                gridEl.style.gap = '30px'; 
+                COLS = 4; // УСТАНОВЛЕНО 4 КОЛОНКИ
+                gridEl.style.gridTemplateColumns = 'repeat(4, 1fr)';
+                gridEl.style.gap = '40px'; 
             }
         }
 
@@ -431,11 +503,11 @@
                 splash.style.opacity = 0;
                 setTimeout(() => {
                     splash.style.display = 'none';
-                    bgMusic.pause(); // МУЗЫКА ОСТАНАВЛИВАЕТСЯ ЗДЕСЬ
+                    bgMusic.pause(); 
                     bgMusic.currentTime = 0;
                     activateMenu(1); 
                 }, 500);
-            }, 2500);
+            }, 2000);
         }
 
         function resetSettings() {
@@ -446,9 +518,14 @@
         function showCloseButton() {
             if (appState !== 'player') return;
             closeBtn.classList.add('visible');
+            if (nextBtn.style.display === 'block') {
+                nextBtn.classList.add('visible');
+            }
+            
             clearTimeout(btnTimer);
             btnTimer = setTimeout(() => {
                 closeBtn.classList.remove('visible');
+                nextBtn.classList.remove('visible');
             }, 3000);
         }
 
@@ -527,6 +604,15 @@
 
         function renderGrid() {
             gridEl.innerHTML = '';
+            // Проверка для мобильного режима
+            if (document.body.classList.contains('mobile-mode')) {
+                gridEl.style.gridTemplateColumns = 'repeat(2, 1fr)';
+                gridEl.style.gap = '15px';
+            } else {
+                gridEl.style.gridTemplateColumns = 'repeat(4, 1fr)';
+                gridEl.style.gap = '40px';
+            }
+
             currentItems.forEach((item, index) => {
                 const card = document.createElement('div');
                 card.className = item.type === 'studio' ? 'card studio' : 'card';
@@ -540,10 +626,16 @@
                 
                 let badge = '';
                 if(item.type === 'folder') {
-                    if (item.genre && item.genre.toLowerCase().includes('сериал')) {
+                    if (item.title.toLowerCase().includes('сезон')) {
+                        badge = `<div class="folder-badge series">${item.title.toUpperCase()}</div>`;
+                    } else if (item.genre && item.genre.toLowerCase().includes('сериал')) {
                         badge = '<div class="folder-badge series">СЕРИАЛ</div>';
                     } else {
                         badge = '<div class="folder-badge">ФРАНШИЗА</div>';
+                    }
+                } else if (item.type === 'movie') {
+                    if (item.title.toLowerCase().includes('серия')) {
+                        badge = `<div class="folder-badge episode">${item.title.toUpperCase()}</div>`;
                     }
                 }
 
@@ -562,8 +654,8 @@
             
             if (item.type === 'movie') {
                 addToHistory(item.id);
-                // Музыка уже остановлена при входе в меню, но на всякий случай
                 bgMusic.pause();
+                activePlayerIndex = index; // Запоминаем, что мы включили
                 let playUrl = item.url;
                 if(!playUrl.includes('&t=') && !playUrl.includes('?t=')) {
                     if(playUrl.includes('?')) playUrl += '&t=0'; else playUrl += '?t=0';
@@ -584,14 +676,53 @@
             document.getElementById('video-frame').src = url;
             document.getElementById('player').style.display = 'block';
             appState = 'player';
+
+            // Проверяем, является ли текущее видео серией (ищем слово "Серия" в названии)
+            const isEpisode = currentItems[activePlayerIndex].title.toLowerCase().includes('серия');
+
+            if (isEpisode && activePlayerIndex !== -1 && activePlayerIndex < currentItems.length - 1) {
+                if (currentItems[activePlayerIndex + 1].type === 'movie') {
+                    nextBtn.style.display = 'block';
+                } else {
+                    nextBtn.style.display = 'none';
+                }
+            } else {
+                nextBtn.style.display = 'none';
+            }
+
             showCloseButton(); 
+        }
+
+        function playNext() {
+            if (activePlayerIndex !== -1 && activePlayerIndex < currentItems.length - 1) {
+                activePlayerIndex++;
+                const nextItem = currentItems[activePlayerIndex];
+                addToHistory(nextItem.id);
+                
+                let playUrl = nextItem.url;
+                if(!playUrl.includes('&t=') && !playUrl.includes('?t=')) {
+                    if(playUrl.includes('?')) playUrl += '&t=0'; else playUrl += '?t=0';
+                }
+                
+                document.getElementById('video-frame').src = playUrl;
+                
+                // Проверяем следующее видео
+                const isEpisode = nextItem.title.toLowerCase().includes('серия');
+                if (isEpisode && activePlayerIndex < currentItems.length - 1 && currentItems[activePlayerIndex + 1].type === 'movie') {
+                    nextBtn.style.display = 'block';
+                } else {
+                    nextBtn.style.display = 'none';
+                }
+            }
         }
 
         function closePlayer() {
             const iframe = document.getElementById('video-frame');
             iframe.src = "about:blank"; 
             document.getElementById('player').style.display = 'none';
+            nextBtn.style.display = 'none';
             appState = 'grid';
+            bgMusic.play().catch(() => {});
             renderFocus();
         }
 
